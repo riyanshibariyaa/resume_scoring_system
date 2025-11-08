@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ResumeScoring.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8cd04768171c716a4aa40da00cfad19c382af425")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+71e78fc6602b9f440a2918ebdd0526a3eedef4a3")]
 [assembly: System.Reflection.AssemblyProductAttribute("ResumeScoring.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ResumeScoring.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

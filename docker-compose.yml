@@ -100,7 +100,7 @@ services:
       - "5000:5000"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=ResumeScoring;User Id=sa;Password=YourStrong@Password123!;TrustServerCertificate=True
+      - Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=ResumeScoring;Integrated Security=True;MultipleActiveResultSets=False;TrustServerCertificate=True;Encrypt=False
       - Services__ParsingUrl=http://parsing-service:5001
       - Services__NLPUrl=http://nlp-service:5002
       - Services__EmbeddingUrl=http://embedding-service:5003
