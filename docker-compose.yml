@@ -1,0 +1,144 @@
+version: '3.8'
+
+services:
+  # Database
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: resume-scoring-db
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Password123!
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourStrong@Password123! -Q "SELECT 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Parsing Service
+  parsing-service:
+    build:
+      context: ./backend/services/parsing
+      dockerfile: Dockerfile
+    container_name: parsing-service
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - DEBUG=false
+    volumes:
+      - ./storage/uploads:/app/uploads
+      - ./storage/parsed:/app/parsed
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # NLP Service
+  nlp-service:
+    build:
+      context: ./backend/services/nlp
+      dockerfile: Dockerfile
+    container_name: nlp-service
+    ports:
+      - "5002:5002"
+    environment:
+      - PORT=5002
+      - DEBUG=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Embedding Service
+  embedding-service:
+    build:
+      context: ./backend/services/embedding
+      dockerfile: Dockerfile
+    container_name: embedding-service
+    ports:
+      - "5003:5003"
+    environment:
+      - PORT=5003
+      - DEBUG=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Scoring Service
+  scoring-service:
+    build:
+      context: ./backend/services/scoring
+      dockerfile: Dockerfile
+    container_name: scoring-service
+    ports:
+      - "5004:5004"
+    environment:
+      - PORT=5004
+      - DEBUG=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=ResumeScoring;User Id=sa;Password=YourStrong@Password123!;TrustServerCertificate=True
+      - Services__ParsingUrl=http://parsing-service:5001
+      - Services__NLPUrl=http://nlp-service:5002
+      - Services__EmbeddingUrl=http://embedding-service:5003
+      - Services__ScoringUrl=http://scoring-service:5004
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      parsing-service:
+        condition: service_healthy
+      nlp-service:
+        condition: service_healthy
+      embedding-service:
+        condition: service_healthy
+      scoring-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: resume-scoring-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+    depends_on:
+      - api-gateway
+
+volumes:
+  sqlserver_data:
+    driver: local
+
+networks:
+  default:
+    name: resume-scoring-network

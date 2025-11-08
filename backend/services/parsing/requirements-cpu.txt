@@ -1,0 +1,27 @@
+# Resume Parsing Service - CPU-Optimized Requirements (No GPU)
+# Optimized for 4GB RAM, Windows development
+
+# Core Dependencies
+Flask==3.0.0
+flask-cors==4.0.0
+python-dotenv==1.0.0
+requests==2.31.0
+
+# Document Processing (Lightweight)
+PyMuPDF==1.23.8
+pdfminer.six==20231228
+python-docx==1.1.0
+
+# OCR (Optional - Install Tesseract separately on Windows)
+# pytesseract==0.3.10
+# Pillow==10.1.0
+
+# Text Processing
+chardet==5.2.0
+
+# Utilities
+werkzeug==3.0.1
+loguru==0.7.2
+
+# Testing (Optional)
+# pytest==7.4.3

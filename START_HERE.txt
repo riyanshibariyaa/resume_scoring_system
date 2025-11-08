@@ -1,0 +1,117 @@
+# ⚡ QUICK START - 3 Steps to Running System
+
+## 🎯 For 4GB RAM, No GPU, Windows
+
+---
+
+## Step 1: Prerequisites (5 minutes)
+
+Install these if you don't have them:
+
+1. **Python 3.10+** → https://www.python.org/downloads/
+2. **.NET 8.0** → https://dotnet.microsoft.com/download
+3. **Node.js 18+** → https://nodejs.org/
+4. **Docker Desktop** → https://www.docker.com/products/docker-desktop
+
+---
+
+## Step 2: Setup (15 minutes)
+
+```batch
+SETUP_LOCAL.bat
+```
+
+**This will:**
+- ✅ Start SQL Server in Docker (database only!)
+- ✅ Install CPU-optimized Python packages (~300MB)
+- ✅ Setup .NET API Gateway
+- ✅ Install React frontend
+- ✅ Download lightweight ML models
+
+**Wait ~15 minutes** ⏱️
+
+---
+
+## Step 3: Start (30 seconds)
+
+```batch
+START_LOCAL.bat
+```
+
+**This opens 6 windows:**
+- 📄 Parsing Service (5001)
+- 🧠 NLP Service (5002)
+- 📊 Embedding Service (5003)
+- ⚡ Scoring Service (5004)
+- 🌐 API Gateway (5000)
+- 🎨 Frontend (3000)
+
+**Wait 30-60 seconds**, then:
+
+🌐 **Open: http://localhost:3000**
+
+---
+
+## 🎉 Done!
+
+**Total time**: ~20 minutes
+**Memory used**: ~1.75 GB (perfect for 4GB RAM!)
+**What's running**: Full AI Resume Scoring System
+
+---
+
+## 🚀 Test It
+
+1. Click **"Upload Resume"**
+2. Select a PDF/DOCX resume
+3. Click **"Create Job"** and add requirements
+4. Click **"Score Candidate"**
+5. See AI-powered results! 🎯
+
+---
+
+## 🛑 Stop Everything
+
+```batch
+STOP_LOCAL.bat
+```
+
+Or just close all service windows.
+
+---
+
+## 📚 Need More Info?
+
+- **Full guide**: `README_LOCAL.md`
+- **Docker comparison**: `DOCKER_VS_LOCAL.md`
+- **Troubleshooting**: `README_LOCAL.md` → Troubleshooting section
+
+---
+
+## 💡 Key Files
+
+| File | Purpose |
+|------|---------|
+| `SETUP_LOCAL.bat` | One-time setup |
+| `START_LOCAL.bat` | Start all services |
+| `STOP_LOCAL.bat` | Stop everything |
+| `README_LOCAL.md` | Complete guide |
+| `DOCKER_VS_LOCAL.md` | Why local is better |
+
+---
+
+## ⚡ That's It!
+
+**From zero to running in 20 minutes!**
+
+No multi-hour Docker builds!
+No 2GB+ downloads!
+No out-of-memory errors!
+
+Perfect for your 4GB RAM Windows machine! 🎊
+
+---
+
+**Questions?** Check `README_LOCAL.md`
+
+**Ready?** Run `SETUP_LOCAL.bat` now!

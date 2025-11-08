@@ -1,0 +1,46 @@
+version: '3.8'
+
+# Docker Compose - DATABASE ONLY
+# Use this for local development with services running outside Docker
+# Optimized for 4GB RAM machines
+
+services:
+  # SQL Server - Only database in Docker
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: resume-scoring-db
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Password123!
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    restart: unless-stopped
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "YourStrong@Password123!" -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    mem_limit: 512m
+    memswap_limit: 512m
+
+volumes:
+  sqlserver_data:
+    driver: local
+
+# Network (for potential future use)
+networks:
+  default:
+    name: resume-scoring-network
+    driver: bridge
+
+# Usage:
+# docker-compose -f docker-compose-local.yml up -d
+# 
+# To stop:
+# docker-compose -f docker-compose-local.yml down
+#
+# Memory usage: ~500 MB (vs 4-6GB for all services in Docker)

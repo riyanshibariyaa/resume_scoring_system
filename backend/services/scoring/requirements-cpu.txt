@@ -1,0 +1,16 @@
+# Scoring Service - CPU-Optimized Requirements (No GPU)
+# Minimal dependencies for scoring algorithm
+
+# Core Dependencies
+Flask==3.0.0
+flask-cors==4.0.0
+python-dotenv==1.0.0
+
+# Data & ML
+numpy==1.26.2
+scikit-learn==1.3.2
+
+# Utilities
+loguru==0.7.2
+
+# This is the lightest service - only ~30MB total

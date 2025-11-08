@@ -1,0 +1,21 @@
+# Embedding Service - CPU-Optimized Requirements (No GPU)
+# Uses lightweight sentence-transformers with CPU-only PyTorch
+
+# Core Dependencies
+Flask==3.0.0
+flask-cors==4.0.0
+python-dotenv==1.0.0
+
+# Embeddings - CPU Optimized (~100MB download)
+# This will auto-install CPU-only PyTorch
+sentence-transformers==2.2.2
+
+# Data
+numpy==1.26.2
+scikit-learn==1.3.2
+
+# Utilities
+loguru==0.7.2
+
+# Note: PyTorch CPU version will be installed automatically
+# Model 'all-MiniLM-L6-v2' is only ~80MB (downloads on first run)

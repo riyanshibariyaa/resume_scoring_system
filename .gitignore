@@ -1,0 +1,25 @@
+# Virtual envs
+venv/
+**/venv/
+.env/
+.envs/
+.env*/
+**/.venv/
+.venv/
+env/
+**/env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Editor / OS
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Node / build
+node_modules/
+dist/
+build/
