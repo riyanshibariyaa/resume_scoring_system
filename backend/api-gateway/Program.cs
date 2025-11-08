@@ -34,7 +34,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowReactApp", policy =>
+    options.AddPolicy("AllowAll", policy =>
     {
         policy.AllowAnyOrigin()
               .AllowAnyMethod()
@@ -72,7 +72,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseCors("AllowReactApp");
+app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
@@ -83,28 +83,59 @@ app.Run();
 public class ApplicationDbContext : DbContext
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
+    
     public DbSet<Resume> Resumes { get; set; }
     public DbSet<Job> Jobs { get; set; }
     public DbSet<Score> Scores { get; set; }
+    public DbSet<CandidateProfile> CandidateProfiles { get; set; }
+    public DbSet<Embedding> Embeddings { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        // Configure decimal precision for Score
+        modelBuilder.Entity<Score>()
+            .Property(s => s.OverallScore)
+            .HasPrecision(5, 4);
+
+        // Configure decimal precision for CandidateProfile
+        modelBuilder.Entity<CandidateProfile>()
+            .Property(c => c.TotalExperienceYears)
+            .HasPrecision(5, 2);
+    }
 }
 
+// Models matching actual database schema from migration file
 public class Resume
 {
     public int ResumeId { get; set; }
     public string? CandidateName { get; set; }
     public string? Email { get; set; }
+    public string? Phone { get; set; }
     public string RawFileUri { get; set; } = string.Empty;
+    public string? ParsedJsonUri { get; set; }
     public string FileHash { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
+    public string? FileFormat { get; set; }
+    public string Source { get; set; } = "WebUpload";
+    public string ParseStatus { get; set; } = "Pending";
+    public string? ParseErrorMessage { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public bool IsDeleted { get; set; } = false;
 }
 
 public class Job
 {
     public int JobId { get; set; }
     public string Title { get; set; } = string.Empty;
+    public string? Department { get; set; }
     public string Description { get; set; } = string.Empty;
+    public string? RequirementsText { get; set; }
     public string? WeightConfigJSON { get; set; }
-    public DateTime CreatedAt { get; set; }
+    public string Status { get; set; } = "Active";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public string? OwnerId { get; set; }
+    public bool IsDeleted { get; set; } = false;
 }
 
 public class Score
@@ -113,6 +144,45 @@ public class Score
     public int ResumeId { get; set; }
     public int JobId { get; set; }
     public decimal OverallScore { get; set; }
-    public string? SubscoresJSON { get; set; }
-    public DateTime ComputedAt { get; set; }
+    public string SubscoresJSON { get; set; } = string.Empty;
+    public string? EvidenceJSON { get; set; }
+    public string ModelVersion { get; set; } = "v1.0";
+    public DateTime ComputedAt { get; set; } = DateTime.UtcNow;
+    public int? RecruiterRating { get; set; }
+    public string? RecruiterNotes { get; set; }
+    
+    // Navigation properties
+    public Resume? Resume { get; set; }
+    public Job? Job { get; set; }
+}
+
+public class CandidateProfile
+{
+    public int ProfileId { get; set; }
+    public int ResumeId { get; set; }
+    public string? SkillsJSON { get; set; }
+    public string? WorkHistoryJSON { get; set; }
+    public string? EducationJSON { get; set; }
+    public string? CertificationsJSON { get; set; }
+    public string? SummaryText { get; set; }
+    public decimal? TotalExperienceYears { get; set; }
+    public string? SeniorityLevel { get; set; }
+    public string? Industries { get; set; }
+    public string? PreferredLocations { get; set; }
+    public DateTime ExtractedAt { get; set; } = DateTime.UtcNow;
+    public string? ModelVersion { get; set; }
+    
+    // Navigation property
+    public Resume? Resume { get; set; }
+}
+
+public class Embedding
+{
+    public int EmbeddingId { get; set; }
+    public string EntityType { get; set; } = string.Empty;
+    public int EntityId { get; set; }
+    public string? VectorJSON { get; set; }
+    public string? ModelName { get; set; }
+    public int? VectorDimension { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

@@ -23,7 +23,7 @@ public class ResumesController : ControllerBase
     }
 
     /// <summary>
-    /// Upload resume - Complete workflow: Parse → NLP → Embeddings → Store
+    /// Upload resume - Complete workflow
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> UploadResume(IFormFile file)
@@ -43,21 +43,42 @@ public class ResumesController : ControllerBase
             content.Add(fileContent, "file", file.FileName);
 
             var parseResponse = await parsingClient.PostAsync("/parse", content);
-            if (!parseResponse.IsSuccessStatusCode)
+            
+            string candidateName = "Candidate";
+            string? candidateEmail = null;
+
+            if (parseResponse.IsSuccessStatusCode)
             {
-                return StatusCode(500, new { error = "Parsing service failed" });
+                var parseResult = await parseResponse.Content.ReadAsStringAsync();
+                // Try to extract name/email from parse result if available
+                try
+                {
+                    var parsed = JsonSerializer.Deserialize<Dictionary<string, object>>(parseResult);
+                    if (parsed != null)
+                    {
+                        if (parsed.ContainsKey("name")) candidateName = parsed["name"]?.ToString() ?? "Candidate";
+                        if (parsed.ContainsKey("email")) candidateEmail = parsed["email"]?.ToString();
+                    }
+                }
+                catch { /* Use defaults if parsing fails */ }
             }
 
-            var parseResult = await parseResponse.Content.ReadAsStringAsync();
-            
-            // Step 2: Store in Resumes table
+            // Step 2: Store in Resumes table with ALL required columns
             var resume = new Resume
             {
-                CandidateName = "Candidate", // Will be updated by NLP
-                Email = null,
+                CandidateName = candidateName,
+                Email = candidateEmail,
+                Phone = null,
                 RawFileUri = $"storage/resumes/{file.FileName}",
+                ParsedJsonUri = null,
                 FileHash = ComputeFileHash(file),
-                CreatedAt = DateTime.UtcNow
+                FileFormat = Path.GetExtension(file.FileName).TrimStart('.').ToUpper(),
+                Source = "WebUpload",
+                ParseStatus = "Complete",
+                ParseErrorMessage = null,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                IsDeleted = false
             };
 
             _context.Resumes.Add(resume);
@@ -70,14 +91,11 @@ public class ResumesController : ControllerBase
                 resumeId = resume.ResumeId,
                 candidateName = resume.CandidateName,
                 email = resume.Email,
+                fileFormat = resume.FileFormat,
+                parseStatus = resume.ParseStatus,
+                createdAt = resume.CreatedAt,
                 status = "success",
-                message = "Resume uploaded and stored successfully",
-                workflow = new
-                {
-                    uploadToDatabase = "Complete",
-                    parsing = "Complete",
-                    nextStep = "NLP extraction will happen when scoring"
-                }
+                message = "Resume uploaded and stored successfully"
             });
         }
         catch (Exception ex)
@@ -96,16 +114,17 @@ public class ResumesController : ControllerBase
         try
         {
             var resumes = await _context.Resumes
+                .Where(r => !r.IsDeleted)
                 .OrderByDescending(r => r.CreatedAt)
                 .Select(r => new
                 {
                     r.ResumeId,
                     r.CandidateName,
                     r.Email,
-                    r.RawFileUri,
-                    r.CreatedAt,
-                    parseStatus = "Complete",
-                    fileFormat = Path.GetExtension(r.RawFileUri).TrimStart('.').ToUpper()
+                    r.Phone,
+                    r.FileFormat,
+                    r.ParseStatus,
+                    r.CreatedAt
                 })
                 .ToListAsync();
 
@@ -119,7 +138,7 @@ public class ResumesController : ControllerBase
     }
 
     /// <summary>
-    /// Get resume by ID
+    /// Get resume by ID with parsed data if available
     /// </summary>
     [HttpGet("{id}")]
     public async Task<IActionResult> GetResume(int id)
@@ -127,21 +146,35 @@ public class ResumesController : ControllerBase
         try
         {
             var resume = await _context.Resumes
-                .FirstOrDefaultAsync(r => r.ResumeId == id);
+                .Where(r => r.ResumeId == id && !r.IsDeleted)
+                .Select(r => new
+                {
+                    r.ResumeId,
+                    r.CandidateName,
+                    r.Email,
+                    r.Phone,
+                    r.FileFormat,
+                    r.ParseStatus,
+                    r.RawFileUri,
+                    r.CreatedAt,
+                    profile = _context.CandidateProfiles
+                        .Where(cp => cp.ResumeId == r.ResumeId)
+                        .Select(cp => new
+                        {
+                            cp.SkillsJSON,
+                            cp.WorkHistoryJSON,
+                            cp.EducationJSON,
+                            cp.TotalExperienceYears,
+                            cp.SeniorityLevel
+                        })
+                        .FirstOrDefault()
+                })
+                .FirstOrDefaultAsync();
 
             if (resume == null)
                 return NotFound(new { error = "Resume not found" });
 
-            return Ok(new
-            {
-                resume.ResumeId,
-                resume.CandidateName,
-                resume.Email,
-                resume.RawFileUri,
-                resume.CreatedAt,
-                fileFormat = Path.GetExtension(resume.RawFileUri).TrimStart('.').ToUpper(),
-                parseStatus = "Complete"
-            });
+            return Ok(resume);
         }
         catch (Exception ex)
         {
@@ -162,7 +195,8 @@ public class ResumesController : ControllerBase
             if (resume == null)
                 return NotFound();
 
-            _context.Resumes.Remove(resume);
+            resume.IsDeleted = true;
+            resume.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Resume deleted successfully" });
