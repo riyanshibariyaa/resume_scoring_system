@@ -30,7 +30,7 @@
    ```powershell
    # Download SQL Server 2019 Express from microsoft.com
    # Or use Docker:
-   docker run -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=YourStrong@Password123" -p 1433:1433 --name sql2019 -d mcr.microsoft.com/mssql/server:2019-latest
+   docker run -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=YourStrong@Password123!" -p 1433:1433 --name sql2019 -d mcr.microsoft.com/mssql/server:2019-latest
    ```
 
 5. **Tesseract OCR** (Optional, for OCR)
@@ -45,7 +45,7 @@
 
 ```powershell
 # Connect to SQL Server and run schema
-sqlcmd -S localhost -U sa -P YourStrong@Password123 -i database\migrations\001_initial_schema.sql
+sqlcmd -S localhost -U sa -P YourStrong@Password123! -i database\migrations\001_initial_schema.sql
 ```
 
 #### 2. Backend Services Setup
@@ -104,7 +104,7 @@ Create `.env` files in each service:
 
 **backend/api-gateway/.env**
 ```
-DATABASE_CONNECTION=Server=localhost;Database=ResumeScoring;User Id=sa;Password=YourStrong@Password123;TrustServerCertificate=True
+DATABASE_CONNECTION=Server=localhost;Database=ResumeScoring;User Id=sa;Password=YourStrong@Password123!;TrustServerCertificate=True
 JWT_SECRET=your-256-bit-secret-key-change-this-in-production
 CORS_ORIGINS=http://localhost:3000
 PARSING_SERVICE_URL=http://localhost:5001
@@ -195,7 +195,7 @@ taskkill /PID <PID> /F
 **Issue: Database connection failed**
 ```powershell
 # Verify SQL Server is running:
-sqlcmd -S localhost -U sa -P YourStrong@Password123 -Q "SELECT @@VERSION"
+sqlcmd -S localhost -U sa -P YourStrong@Password123! -Q "SELECT @@VERSION"
 ```
 
 **Issue: Python module not found**

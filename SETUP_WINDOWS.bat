@@ -115,7 +115,7 @@ echo [7/7] Creating environment files...
 REM Create .env for API Gateway
 if not exist backend\api-gateway\.env (
     (
-        echo DATABASE_CONNECTION=Server=localhost;Database=ResumeScoring;User Id=sa;Password=YourStrong@Password123;TrustServerCertificate=True
+        echo DATABASE_CONNECTION=Server=localhost;Database=ResumeScoring;User Id=sa;Password=YourStrong@Password123!;TrustServerCertificate=True
         echo JWT_SECRET=your-256-bit-secret-key-change-this-in-production
         echo CORS_ORIGINS=http://localhost:3000
         echo PARSING_SERVICE_URL=http://localhost:5001
@@ -160,7 +160,7 @@ echo.
 echo Next Steps:
 echo.
 echo 1. Setup Database:
-echo    sqlcmd -S localhost -U sa -P YourStrong@Password123 -i database\migrations\001_initial_schema.sql
+echo    sqlcmd -S localhost -U sa -P YourStrong@Password123! -i database\migrations\001_initial_schema.sql
 echo.
 echo 2. Run the application:
 echo    - Open 5 terminal windows

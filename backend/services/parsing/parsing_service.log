@@ -1,0 +1,16 @@
+2025-11-08 11:55:51.504 | INFO     | __main__:<module>:495 - Starting Parsing Service on port 5001
+2025-11-08 12:18:08.999 | INFO     | __main__:<module>:495 - Starting Parsing Service on port 5001
+2025-11-08 13:20:55.078 | INFO     | __main__:<module>:495 - Starting Parsing Service on port 5001
+2025-11-08 13:25:16.406 | INFO     | __main__:parse_resume:366 - File saved: ./uploads\20251108_075516_Riyanshi_Bariya_CV.pdf
+2025-11-08 13:25:16.631 | INFO     | __main__:parse_document:61 - Parsing document: ./uploads\20251108_075516_Riyanshi_Bariya_CV.pdf (format: pdf)
+2025-11-08 13:25:16.878 | INFO     | __main__:_parse_pdf:131 - Successfully parsed PDF: 5971 characters
+2025-11-08 13:25:17.081 | INFO     | __main__:parse_resume:406 - Successfully parsed document: Riyanshi_Bariya_CV.pdf (hash: 9339fec00ff7)
+2025-11-08 13:38:14.335 | INFO     | __main__:parse_resume:366 - File saved: ./uploads\20251108_080814_Riyanshi_Bariya_CV.pdf
+2025-11-08 13:38:14.522 | INFO     | __main__:parse_document:61 - Parsing document: ./uploads\20251108_080814_Riyanshi_Bariya_CV.pdf (format: pdf)
+2025-11-08 13:38:14.775 | INFO     | __main__:_parse_pdf:131 - Successfully parsed PDF: 5971 characters
+2025-11-08 13:38:14.818 | INFO     | __main__:parse_resume:406 - Successfully parsed document: Riyanshi_Bariya_CV.pdf (hash: 9339fec00ff7)
+2025-11-08 13:41:29.088 | INFO     | __main__:<module>:495 - Starting Parsing Service on port 5001
+2025-11-08 13:51:06.169 | INFO     | __main__:<module>:495 - Starting Parsing Service on port 5001
+2025-11-08 15:41:25.651 | INFO     | __main__:<module>:495 - Starting Parsing Service on port 5001
+2025-11-08 15:59:16.086 | INFO     | __main__:<module>:495 - Starting Parsing Service on port 5001
+2025-11-08 16:15:32.201 | INFO     | __main__:<module>:495 - Starting Parsing Service on port 5001

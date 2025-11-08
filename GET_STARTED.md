@@ -75,7 +75,7 @@ This will:
 
 ### Step 3: Initialize Database
 ```batch
-sqlcmd -S localhost -U sa -P YourStrong@Password123 -i database\migrations\001_initial_schema.sql
+sqlcmd -S localhost -U sa -P YourStrong@Password123! -i database\migrations\001_initial_schema.sql
 ```
 
 ### Step 4: Start All Services
