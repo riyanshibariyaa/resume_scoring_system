@@ -23,8 +23,10 @@ public class JobsController : ControllerBase
         {
             Title = request.Title,
             Description = request.Description,
-            WeightConfigJSON = request.WeightConfigJSON,
-            CreatedAt = DateTime.UtcNow
+            RequiredSkills = request.RequiredSkills,
+            WeightConfig = request.WeightConfig,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
         _context.Jobs.Add(job);
@@ -36,7 +38,9 @@ public class JobsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetJobs()
     {
-        var jobs = await _context.Jobs.ToListAsync();
+        var jobs = await _context.Jobs
+            .OrderByDescending(j => j.CreatedAt)
+            .ToListAsync();
         return Ok(jobs);
     }
 
@@ -48,6 +52,42 @@ public class JobsController : ControllerBase
             return NotFound();
         return Ok(job);
     }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateJob(int id, [FromBody] JobCreateRequest request)
+    {
+        var job = await _context.Jobs.FindAsync(id);
+        if (job == null)
+            return NotFound();
+
+        job.Title = request.Title;
+        job.Description = request.Description;
+        job.RequiredSkills = request.RequiredSkills;
+        job.WeightConfig = request.WeightConfig;
+        job.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(job);
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteJob(int id)
+    {
+        var job = await _context.Jobs.FindAsync(id);
+        if (job == null)
+            return NotFound();
+
+        _context.Jobs.Remove(job);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Job deleted successfully" });
+    }
 }
 
-public record JobCreateRequest(string Title, string Description, string? WeightConfigJSON);
+public record JobCreateRequest(
+    string Title, 
+    string Description, 
+    string? RequiredSkills, 
+    string? WeightConfig
+);

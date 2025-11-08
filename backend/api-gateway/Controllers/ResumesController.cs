@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace ResumeScoring.Api.Controllers;
 
@@ -35,7 +36,14 @@ public class ResumesController : ControllerBase
 
             _logger.LogInformation($"Processing resume upload: {file.FileName}");
 
-            // Step 1: Call Parsing Service
+            // Step 1: Read file content
+            string rawText = "";
+            using (var reader = new StreamReader(file.OpenReadStream()))
+            {
+                rawText = await reader.ReadToEndAsync();
+            }
+
+            // Step 2: Call Parsing Service
             var parsingClient = _clientFactory.CreateClient("ParsingService");
             var content = new MultipartFormDataContent();
             var fileContent = new StreamContent(file.OpenReadStream());
@@ -46,6 +54,7 @@ public class ResumesController : ControllerBase
             
             string candidateName = "Candidate";
             string? candidateEmail = null;
+            string? candidatePhone = null;
 
             if (parseResponse.IsSuccessStatusCode)
             {
@@ -56,29 +65,29 @@ public class ResumesController : ControllerBase
                     var parsed = JsonSerializer.Deserialize<Dictionary<string, object>>(parseResult);
                     if (parsed != null)
                     {
-                        if (parsed.ContainsKey("name")) candidateName = parsed["name"]?.ToString() ?? "Candidate";
-                        if (parsed.ContainsKey("email")) candidateEmail = parsed["email"]?.ToString();
+                        if (parsed.ContainsKey("name")) 
+                            candidateName = parsed["name"]?.ToString() ?? "Candidate";
+                        if (parsed.ContainsKey("email")) 
+                            candidateEmail = parsed["email"]?.ToString();
+                        if (parsed.ContainsKey("phone"))
+                            candidatePhone = parsed["phone"]?.ToString();
                     }
                 }
                 catch { /* Use defaults if parsing fails */ }
             }
 
-            // Step 2: Store in Resumes table with ALL required columns
+            // Step 3: Store in Resumes table with ACTUAL database columns
             var resume = new Resume
             {
                 CandidateName = candidateName,
                 Email = candidateEmail,
-                Phone = null,
-                RawFileUri = $"storage/resumes/{file.FileName}",
-                ParsedJsonUri = null,
+                Phone = candidatePhone,
+                RawText = rawText,
                 FileHash = ComputeFileHash(file),
-                FileFormat = Path.GetExtension(file.FileName).TrimStart('.').ToUpper(),
-                Source = "WebUpload",
-                ParseStatus = "Complete",
-                ParseErrorMessage = null,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-                IsDeleted = false
+                FileName = file.FileName,
+                FileType = Path.GetExtension(file.FileName).TrimStart('.').ToUpper(),
+                UploadedAt = DateTime.UtcNow,
+                ProcessedAt = DateTime.UtcNow
             };
 
             _context.Resumes.Add(resume);
@@ -91,9 +100,10 @@ public class ResumesController : ControllerBase
                 resumeId = resume.ResumeId,
                 candidateName = resume.CandidateName,
                 email = resume.Email,
-                fileFormat = resume.FileFormat,
-                parseStatus = resume.ParseStatus,
-                createdAt = resume.CreatedAt,
+                phone = resume.Phone,
+                fileName = resume.FileName,
+                fileType = resume.FileType,
+                uploadedAt = resume.UploadedAt,
                 status = "success",
                 message = "Resume uploaded and stored successfully"
             });
@@ -114,17 +124,17 @@ public class ResumesController : ControllerBase
         try
         {
             var resumes = await _context.Resumes
-                .Where(r => !r.IsDeleted)
-                .OrderByDescending(r => r.CreatedAt)
+                .OrderByDescending(r => r.UploadedAt)
                 .Select(r => new
                 {
                     r.ResumeId,
                     r.CandidateName,
                     r.Email,
                     r.Phone,
-                    r.FileFormat,
-                    r.ParseStatus,
-                    r.CreatedAt
+                    r.FileName,
+                    r.FileType,
+                    r.UploadedAt,
+                    r.ProcessedAt
                 })
                 .ToListAsync();
 
@@ -146,26 +156,28 @@ public class ResumesController : ControllerBase
         try
         {
             var resume = await _context.Resumes
-                .Where(r => r.ResumeId == id && !r.IsDeleted)
+                .Where(r => r.ResumeId == id)
                 .Select(r => new
                 {
                     r.ResumeId,
                     r.CandidateName,
                     r.Email,
                     r.Phone,
-                    r.FileFormat,
-                    r.ParseStatus,
-                    r.RawFileUri,
-                    r.CreatedAt,
-                    profile = _context.CandidateProfiles
-                        .Where(cp => cp.ResumeId == r.ResumeId)
-                        .Select(cp => new
+                    r.FileName,
+                    r.FileType,
+                    r.RawText,
+                    r.UploadedAt,
+                    r.ProcessedAt,
+                    parsedData = _context.ParsedData
+                        .Where(pd => pd.ResumeId == r.ResumeId)
+                        .Select(pd => new
                         {
-                            cp.SkillsJSON,
-                            cp.WorkHistoryJSON,
-                            cp.EducationJSON,
-                            cp.TotalExperienceYears,
-                            cp.SeniorityLevel
+                            pd.Skills,
+                            pd.Experience,
+                            pd.Education,
+                            pd.Certifications,
+                            pd.Summary,
+                            pd.ParsedAt
                         })
                         .FirstOrDefault()
                 })
@@ -195,8 +207,7 @@ public class ResumesController : ControllerBase
             if (resume == null)
                 return NotFound();
 
-            resume.IsDeleted = true;
-            resume.UpdatedAt = DateTime.UtcNow;
+            _context.Resumes.Remove(resume);
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Resume deleted successfully" });
@@ -210,7 +221,7 @@ public class ResumesController : ControllerBase
 
     private string ComputeFileHash(IFormFile file)
     {
-        using var md5 = System.Security.Cryptography.MD5.Create();
+        using var md5 = MD5.Create();
         using var stream = file.OpenReadStream();
         var hash = md5.ComputeHash(stream);
         return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
