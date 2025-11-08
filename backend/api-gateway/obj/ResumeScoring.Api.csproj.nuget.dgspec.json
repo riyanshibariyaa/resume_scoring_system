@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "E:\\SK\\resume-scoring-system-clean\\backend\\api-gateway\\ResumeScoring.Api.csproj": {}
+    "E:\\SK\\resume-scoring-system\\backend\\api-gateway\\ResumeScoring.Api.csproj": {}
   },
   "projects": {
-    "E:\\SK\\resume-scoring-system-clean\\backend\\api-gateway\\ResumeScoring.Api.csproj": {
+    "E:\\SK\\resume-scoring-system\\backend\\api-gateway\\ResumeScoring.Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "E:\\SK\\resume-scoring-system-clean\\backend\\api-gateway\\ResumeScoring.Api.csproj",
+        "projectUniqueName": "E:\\SK\\resume-scoring-system\\backend\\api-gateway\\ResumeScoring.Api.csproj",
         "projectName": "ResumeScoring.Api",
-        "projectPath": "E:\\SK\\resume-scoring-system-clean\\backend\\api-gateway\\ResumeScoring.Api.csproj",
+        "projectPath": "E:\\SK\\resume-scoring-system\\backend\\api-gateway\\ResumeScoring.Api.csproj",
         "packagesPath": "C:\\Users\\bariy\\.nuget\\packages\\",
-        "outputPath": "E:\\SK\\resume-scoring-system-clean\\backend\\api-gateway\\obj\\",
+        "outputPath": "E:\\SK\\resume-scoring-system\\backend\\api-gateway\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\bariy\\AppData\\Roaming\\NuGet\\NuGet.Config"

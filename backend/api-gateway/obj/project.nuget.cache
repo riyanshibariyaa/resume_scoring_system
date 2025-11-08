@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "wqx/GCu3+z4=",
+  "dgSpecHash": "RkKcz5xaSJA=",
   "success": true,
-  "projectFilePath": "E:\\SK\\resume-scoring-system-clean\\backend\\api-gateway\\ResumeScoring.Api.csproj",
+  "projectFilePath": "E:\\SK\\resume-scoring-system\\backend\\api-gateway\\ResumeScoring.Api.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\bariy\\.nuget\\packages\\azure.core\\1.25.0\\azure.core.1.25.0.nupkg.sha512",
     "C:\\Users\\bariy\\.nuget\\packages\\azure.identity\\1.7.0\\azure.identity.1.7.0.nupkg.sha512",
