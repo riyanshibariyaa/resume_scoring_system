@@ -289,3 +289,7 @@ E:\SK\resume-scoring-system\backend\api-gateway\obj\Debug\net8.0\refint\ResumeSc
 E:\SK\resume-scoring-system\backend\api-gateway\obj\Debug\net8.0\ResumeScoring.Api.pdb
 E:\SK\resume-scoring-system\backend\api-gateway\obj\Debug\net8.0\ResumeScoring.Api.genruntimeconfig.cache
 E:\SK\resume-scoring-system\backend\api-gateway\obj\Debug\net8.0\ref\ResumeScoring.Api.dll
+E:\SK\resume-scoring-system\backend\api-gateway\bin\Debug\net8.0\appsettings-new-connectionstring.json
+E:\SK\resume-scoring-system\backend\api-gateway\bin\Debug\net8.0\appsettings.Development.json
+E:\SK\resume-scoring-system\backend\api-gateway\bin\Debug\net8.0\sql-server-config.json
+E:\SK\resume-scoring-system\backend\api-gateway\bin\Debug\net8.0\connection-string-CORRECT.json
