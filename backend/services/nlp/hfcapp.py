@@ -288,36 +288,6 @@ class ResumeExtractor:
             'Microservices': {'aliases': ['microservices'], 'category': 'other'},
             'Agile': {'aliases': ['agile', 'scrum'], 'category': 'soft_skills'},
             'Linux': {'aliases': ['linux', 'unix'], 'category': 'other'},
-            
-            # Web Basics
-            'HTML': {'aliases': ['html', 'html5'], 'category': 'frameworks'},
-            'CSS': {'aliases': ['css', 'css3'], 'category': 'frameworks'},
-            
-            # Data & Analytics
-            'Tableau': {'aliases': ['tableau'], 'category': 'tools'},
-            'Jira': {'aliases': ['jira'], 'category': 'tools'},
-            
-            # Enterprise/ERP
-            'SAP': {'aliases': ['sap', 'sap data services'], 'category': 'other'},
-            'ERP': {'aliases': ['erp', 'erp integration'], 'category': 'other'},
-            'ETL': {'aliases': ['etl'], 'category': 'other'},
-            
-            # AI Tools
-            'OpenAI': {'aliases': ['openai', 'genai', 'azure openai'], 'category': 'other'},
-            'YOLO': {'aliases': ['yolo', 'yolo object detection'], 'category': 'other'},
-            'MobileNetV2': {'aliases': ['mobilenet', 'mobilenetv2'], 'category': 'other'},
-            'Gradio': {'aliases': ['gradio'], 'category': 'frameworks'},
-            
-            # IoT
-            'IoT': {'aliases': ['iot', 'internet of things'], 'category': 'other'},
-            'ESP8266': {'aliases': ['esp8266'], 'category': 'other'},
-            'Firebase': {'aliases': ['firebase'], 'category': 'cloud'},
-            
-            # Protocols & Others
-            'UDP': {'aliases': ['udp'], 'category': 'other'},
-            'GeoJSON': {'aliases': ['geojson'], 'category': 'other'},
-            'JWT': {'aliases': ['jwt', 'json web token'], 'category': 'other'},
-            'POCO': {'aliases': ['poco', 'poco framework'], 'category': 'frameworks'},
         }
 
 
@@ -379,16 +349,16 @@ class ResumeExtractor:
             # NEW: More flexible date patterns
             has_date = False
             
-            # Pattern 1: Month Year - Month Year (Jan 2020 - Dec 2021, May'2025, etc.)
-            pattern1 = r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[''\s]*\d{4}\s*[-–—]\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[''\s]*\d{4}"
-            # Pattern 2: Month Year - Present (Jan 2020 - Present, May'2025 - Present)
-            pattern2 = r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[''\s]*\d{4}\s*[-–—]\s*(Present|Current|Now)"
+            # Pattern 1: Month Year - Month Year (Jan 2020 - Dec 2021)
+            pattern1 = r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\s*[-–]\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}'
+            # Pattern 2: Month Year - Present (Jan 2020 - Present)
+            pattern2 = r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\s*[-–]\s*(Present|Current|Now)'
             # Pattern 3: Year - Year (2020 - 2021)
-            pattern3 = r'\b(19|20)\d{2}\s*[-–—]\s*(19|20)\d{2}\b'
+            pattern3 = r'\b(19|20)\d{2}\s*[-–]\s*(19|20)\d{2}\b'
             # Pattern 4: Year - Present (2020 - Present)
-            pattern4 = r'\b(19|20)\d{2}\s*[-–—]\s*(Present|Current|Now)'
+            pattern4 = r'\b(19|20)\d{2}\s*[-–]\s*(Present|Current|Now)'
             # Pattern 5: Just year range in parentheses ((2020-2021))
-            pattern5 = r'\(?(19|20)\d{2}\s*[-–—]\s*((19|20)\d{2}|Present|Current)\)?'
+            pattern5 = r'\(?(19|20)\d{2}\s*[-–]\s*((19|20)\d{2}|Present|Current)\)?'
             
             date_patterns = [pattern1, pattern2, pattern3, pattern4, pattern5]
             
@@ -480,8 +450,8 @@ class ResumeExtractor:
         """Extract dates - IMPROVED VERSION"""
         dates = []
         
-        # Pattern 1: Full month name + year (January 2020, Jan 2020, May'2025, etc.)
-        month_year_pattern = r"(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)['\s]*(\d{4})"
+        # Pattern 1: Full month name + year (January 2020, Jan 2020)
+        month_year_pattern = r'\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{4})\b'
         matches = re.findall(month_year_pattern, text, re.IGNORECASE)
         
         for match in matches:

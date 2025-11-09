@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Security.Cryptography;
 using ResumeScoring.Api.Data;
+using static ResumeScoring.Api.Data.ApplicationDbContext;
 
 namespace ResumeScoring.Api.Controllers;
 
@@ -222,7 +223,7 @@ public class ResumesController : ControllerBase
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "NLP service call failed — continuing without structured extracted_data");
+                        _logger.LogWarning(ex, "NLP service call failed – continuing without structured extracted_data");
                     }
                 }
             }
@@ -270,7 +271,7 @@ public class ResumesController : ControllerBase
                 ParsedAt = DateTime.UtcNow
             };
 
-            _context.ParsedData.Add(parsedDataEntity);
+            _context.ParsedDatas.Add(parsedDataEntity);
             await _context.SaveChangesAsync();
 
             _logger.LogInformation($"ParsedData created successfully: ID={parsedDataEntity.ParsedDataId}");
@@ -355,7 +356,7 @@ public class ResumesController : ControllerBase
                     r.RawText,
                     r.UploadedAt,
                     r.ProcessedAt,
-                    parsedData = _context.ParsedData
+                    parsedData = _context.ParsedDatas
                         .Where(pd => pd.ResumeId == r.ResumeId)
                         .Select(pd => new
                         {

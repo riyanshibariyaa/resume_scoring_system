@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
+
 namespace ResumeScoring.Api.Data
 {
     public class ApplicationDbContext : DbContext
@@ -14,10 +15,10 @@ namespace ResumeScoring.Api.Data
         public DbSet<Job> Jobs { get; set; }
         public DbSet<Resume> Resumes { get; set; }
         // Add inside ApplicationDbContext class (near other DbSet<>)
-        public DbSet<ParsedData> ParsedData { get; set; }
+        public DbSet<ParsedData> ParsedDatas { get; set; }
 
         public DbSet<ResumeScore> ResumeScores { get; set; }
-
+        public DbSet<Embedding> Embeddings { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -36,130 +37,152 @@ namespace ResumeScoring.Api.Data
                 .HasForeignKey(rs => rs.JobId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
-    }
 
-    // Job Entity
-    [Table("Jobs")]
-    public class Job
-    {
-        [Key]
-        public int JobId { get; set; }
+        // Embedding Entity
+        [Table("Embeddings")]
+        public class Embedding
+        {
+            [Key]
+            public int EmbeddingId { get; set; }
 
-        [Required]
-        [StringLength(200)]
-        public string Title { get; set; } = string.Empty;
+            [Required]
+            public int EntityId { get; set; }
 
-        public string? Description { get; set; }
+            [Required]
+            [StringLength(50)]
+            public string EntityType { get; set; } = string.Empty;
 
-        public string? RequiredSkills { get; set; }
+            [Required]
+            public string VectorData { get; set; } = string.Empty;
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+            public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        }
 
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        // Job Entity
+        [Table("Jobs")]
+        public class Job
+        {
+            internal string? EmbeddingVector;
 
-        public string? WeightConfig { get; set; }
-    }
 
-    // Resume Entity
-    [Table("Resumes")]
-    public class Resume
-    {
-        [Key]
-        public int ResumeId { get; set; }
+            [Key]
+            public int JobId { get; set; }
 
-        [Required]
-        [StringLength(255)]
-        public string FileName { get; set; } = string.Empty;
+            [Required]
+            [StringLength(200)]
+            public string Title { get; set; } = string.Empty;
 
-        [StringLength(50)]
-        public string? FileType { get; set; }
+            public string? Description { get; set; }
 
-        [StringLength(200)]
-        public string? CandidateName { get; set; }
+            public string? RequiredSkills { get; set; }
 
-        [StringLength(200)]
-        public string? Email { get; set; }
+            public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        [StringLength(50)]
-        public string? Phone { get; set; }
+            public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-        public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
+            public string? WeightConfig { get; set; }
+        }
 
-        public DateTime? ProcessedAt { get; set; }
+        // Resume Entity
+        [Table("Resumes")]
+        public class Resume
+        {
+            [Key]
+            public int ResumeId { get; set; }
 
-        public string? RawText { get; set; }
+            [Required]
+            [StringLength(255)]
+            public string FileName { get; set; } = string.Empty;
 
-        [StringLength(100)]
-        public string? FileHash { get; set; }
-    }
+            [StringLength(50)]
+            public string? FileType { get; set; }
 
-    // ResumeScore Entity
-    [Table("ResumeScores")]
-    public class ResumeScore
-    {
-        [Key]
-        public int ScoreId { get; set; }
+            [StringLength(200)]
+            public string? CandidateName { get; set; }
 
-        [Required]
-        public int ResumeId { get; set; }
+            [StringLength(200)]
+            public string? Email { get; set; }
 
-        [Required]
-        public int JobId { get; set; }
+            [StringLength(50)]
+            public string? Phone { get; set; }
 
-        [Column(TypeName = "decimal(5,2)")]
-        public decimal TotalScore { get; set; }
+            public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 
-        [Column(TypeName = "decimal(5,2)")]
-        public decimal EducationScore { get; set; }
+            public DateTime? ProcessedAt { get; set; }
 
-        [Column(TypeName = "decimal(5,2)")]
-        public decimal ExperienceScore { get; set; }
+            public string? RawText { get; set; }
 
-        [Column(TypeName = "decimal(5,2)")]
-        public decimal SkillsScore { get; set; }
+            [StringLength(100)]
+            public string? FileHash { get; set; }
+        }
 
-        public DateTime ScoredAt { get; set; } = DateTime.UtcNow;
+        // ResumeScore Entity
+        [Table("ResumeScores")]
+        public class ResumeScore
+        {
+            [Key]
+            public int ScoreId { get; set; }
 
-        // Navigation properties
-        [ForeignKey("ResumeId")]
-        public virtual Resume? Resume { get; set; }
+            [Required]
+            public int ResumeId { get; set; }
 
-        [ForeignKey("JobId")]
-        public virtual Job? Job { get; set; }
-    }
+            [Required]
+            public int JobId { get; set; }
+
+            [Column(TypeName = "decimal(5,2)")]
+            public decimal TotalScore { get; set; }
+
+            [Column(TypeName = "decimal(5,2)")]
+            public decimal EducationScore { get; set; }
+
+            [Column(TypeName = "decimal(5,2)")]
+            public decimal ExperienceScore { get; set; }
+
+            [Column(TypeName = "decimal(5,2)")]
+            public decimal SkillsScore { get; set; }
+
+            public DateTime ScoredAt { get; set; } = DateTime.UtcNow;
+
+            // Navigation properties
+            [ForeignKey("ResumeId")]
+            public virtual Resume? Resume { get; set; }
+
+            [ForeignKey("JobId")]
+            public virtual Job? Job { get; set; }
+        }
         // ParsedData Entity - paste into ApplicationDbContext.cs (below ResumeScore)
-    [Table("ParsedData")]
-    public class ParsedData
-    {
-        [Key]
-        public int ParsedDataId { get; set; }
+        [Table("ParsedData")]
+        public class ParsedData
+        {
+            [Key]
+            public int ParsedDataId { get; set; }
 
-        // FK to Resume (nullable if parsing can be done later)
-        public int? ResumeId { get; set; }
+            // FK to Resume (nullable if parsing can be done later)
+            public int? ResumeId { get; set; }
 
-        // Full extracted text (may be large)
-        public string? Text { get; set; }
+            // Full extracted text (may be large)
+            public string? Text { get; set; }
 
-        // JSON blobs for structured parts from parser/NLP
-        public string? SectionsJson { get; set; }
-        public string? MetadataJson { get; set; }
-        public string? ExtractedProfileJson { get; set; } // from NLP service
+            // JSON blobs for structured parts from parser/NLP
+            public string? SectionsJson { get; set; }
+            public string? MetadataJson { get; set; }
+            public string? ExtractedProfileJson { get; set; } // from NLP service
 
-        // Common convenience fields (shallow copies for easy queries)
-        public string? Skills { get; set; }
-        public string? Education { get; set; }
-        public string? Experience { get; set; }
-        public string? Certifications { get; set; }
-        public string? Summary { get; set; }
+            // Common convenience fields (shallow copies for easy queries)
+            public string? Skills { get; set; }
+            public string? Education { get; set; }
+            public string? Experience { get; set; }
+            public string? Certifications { get; set; }
+            public string? Summary { get; set; }
 
-        public string? FileHash { get; set; }
-        public string? RawFilePath { get; set; }
-        public string? ParsedFilePath { get; set; }
+            public string? FileHash { get; set; }
+            public string? RawFilePath { get; set; }
+            public string? ParsedFilePath { get; set; }
 
-        public DateTime ParsedAt { get; set; } = DateTime.UtcNow;
+            public DateTime ParsedAt { get; set; } = DateTime.UtcNow;
 
-        [ForeignKey("ResumeId")]
-        public virtual Resume? Resume { get; set; }
+            [ForeignKey("ResumeId")]
+            public virtual Resume? Resume { get; set; }
+        }
     }
-
 }

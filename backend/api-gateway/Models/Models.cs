@@ -77,12 +77,25 @@ namespace ResumeScoring.Models
         public string? WeightConfig { get; set; }
 
         [Required]
+        public string? EmbeddingVector { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime? UpdatedAt { get; set; }
 
         // Navigation properties
         public virtual ICollection<ResumeScore> ResumeScores { get; set; } = new List<ResumeScore>();
+    }
+    
+    [Table("Embeddings")]
+    public class Embedding
+    {
+        public int EmbeddingId { get; set; }
+        public int? ResumeId { get; set; }
+        public string EmbeddingVector { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        
+        // Navigation property
+        public Resume? Resume { get; set; }
     }
 
     // ========================================

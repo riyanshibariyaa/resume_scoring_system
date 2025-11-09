@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ResumeScoring.Api.Data;
 using System.Text.Json;
+using static ResumeScoring.Api.Data.ApplicationDbContext;
 
 namespace ResumeScoring.Api.Controllers
 {
@@ -39,6 +40,7 @@ namespace ResumeScoring.Api.Controllers
             return await ScoreResume(request.ResumeId, request.JobId);
         }
 
+       
         [HttpPost("score-resume/{resumeId}/job/{jobId}")]
         public async Task<IActionResult> ScoreResume(int resumeId, int jobId)
         {
@@ -53,10 +55,6 @@ namespace ResumeScoring.Api.Controllers
                     return NotFound(new { message = "Resume not found" });
                 }
 
-                var parsedData = await _context.ParsedData
-                    .Where(pd => pd.ResumeId == resumeId)
-                    .FirstOrDefaultAsync();
-
                 // Get job
                 var job = await _context.Jobs.FindAsync(jobId);
                 if (job == null)
@@ -64,65 +62,138 @@ namespace ResumeScoring.Api.Controllers
                     return NotFound(new { message = "Job not found" });
                 }
 
+                // ===== TRY SEMANTIC SIMILARITY FIRST =====
+                var semanticScore = await CalculateSemanticScore(resumeId, jobId);
+                
+                if (semanticScore > 0)
+                {
+                    // SUCCESS! Use semantic similarity as primary score
+                    _logger.LogInformation($"✅ Using SEMANTIC SIMILARITY scoring: {semanticScore:F2}%");
+                    
+                    // Still calculate component scores for UI breakdown
+                    var parsedData = await _context.ParsedDatas
+                        .FirstOrDefaultAsync(pd => pd.ResumeId == resumeId);
+                    
+                    decimal skillsScore = 50m;
+                    decimal experienceScore = 50m;
+                    decimal educationScore = 50m;
+                    
+                    if (parsedData != null && !string.IsNullOrEmpty(parsedData.Skills))
+                    {
+                        skillsScore = CalculateSkillsScoreFromParsedData(parsedData, job);
+                        experienceScore = CalculateExperienceScoreFromParsedData(parsedData);
+                        educationScore = CalculateEducationScoreFromParsedData(parsedData);
+                    }
+                    
+                    // Save or update score
+                    var existingScore = await _context.ResumeScores
+                        .FirstOrDefaultAsync(s => s.ResumeId == resumeId && s.JobId == jobId);
+
+                    if (existingScore != null)
+                    {
+                        existingScore.TotalScore = semanticScore;
+                        existingScore.EducationScore = educationScore;
+                        existingScore.ExperienceScore = experienceScore;
+                        existingScore.SkillsScore = skillsScore;
+                        existingScore.ScoredAt = DateTime.UtcNow;
+                    }
+                    else
+                    {
+                        var score = new ResumeScore
+                        {
+                            ResumeId = resumeId,
+                            JobId = jobId,
+                            TotalScore = semanticScore,
+                            EducationScore = educationScore,
+                            ExperienceScore = experienceScore,
+                            SkillsScore = skillsScore,
+                            ScoredAt = DateTime.UtcNow
+                        };
+                        _context.ResumeScores.Add(score);
+                    }
+
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new
+                    {
+                        resumeId,
+                        jobId,
+                        totalScore = Math.Round(semanticScore, 2),
+                        educationScore = Math.Round(educationScore, 2),
+                        experienceScore = Math.Round(experienceScore, 2),
+                        skillsScore = Math.Round(skillsScore, 2),
+                        usedParsedData = true,
+                        usedSemanticSimilarity = true,
+                        message = "✅ Scored using SEMANTIC SIMILARITY (embeddings)"
+                    });
+                }
+                
+                // ===== FALLBACK: Use existing keyword-based scoring =====
+                _logger.LogWarning($"⚠️ Semantic similarity not available, using FALLBACK scoring");
+
+                var parsedDataFallback = await _context.ParsedDatas
+                    .Where(pd => pd.ResumeId == resumeId)
+                    .FirstOrDefaultAsync();
+
                 // Parse weight config
                 var weights = ParseWeightConfig(job.WeightConfig);
 
                 // Calculate scores using ParsedData if available, fallback to RawText
-                decimal educationScore;
-                decimal experienceScore;
-                decimal skillsScore;
+                decimal educationScoreFallback;
+                decimal experienceScoreFallback;
+                decimal skillsScoreFallback;
 
-                if (parsedData != null && !string.IsNullOrEmpty(parsedData.Skills))
+                if (parsedDataFallback != null && !string.IsNullOrEmpty(parsedDataFallback.Skills))
                 {
                     // Use structured data for better scoring
-                    educationScore = CalculateEducationScoreFromParsedData(parsedData);
-                    experienceScore = CalculateExperienceScoreFromParsedData(parsedData);
-                    skillsScore = CalculateSkillsScoreFromParsedData(parsedData, job);
+                    educationScoreFallback = CalculateEducationScoreFromParsedData(parsedDataFallback);
+                    experienceScoreFallback = CalculateExperienceScoreFromParsedData(parsedDataFallback);
+                    skillsScoreFallback = CalculateSkillsScoreFromParsedData(parsedDataFallback, job);
                     _logger.LogInformation("Using ParsedData for scoring");
                 }
                 else
                 {
                     // Fallback to basic keyword-based scoring
-                    educationScore = CalculateEducationScore(resume);
-                    experienceScore = CalculateExperienceScore(resume);
-                    skillsScore = CalculateSkillsScore(resume, job);
+                    educationScoreFallback = CalculateEducationScore(resume);
+                    experienceScoreFallback = CalculateExperienceScore(resume);
+                    skillsScoreFallback = CalculateSkillsScore(resume, job);
                     _logger.LogWarning($"No ParsedData found for resume {resumeId}, using fallback scoring");
                 }
 
                 // Calculate weighted total
                 var totalScore = 
-                    (educationScore * weights.Education) +
-                    (experienceScore * weights.Experience) +
-                    (skillsScore * weights.Skills);
+                    (educationScoreFallback * weights.Education) +
+                    (experienceScoreFallback * weights.Experience) +
+                    (skillsScoreFallback * weights.Skills);
 
                 // Check if score already exists
-                var existingScore = await _context.ResumeScores
+                var existingScoreFallback = await _context.ResumeScores
                     .FirstOrDefaultAsync(s => s.ResumeId == resumeId && s.JobId == jobId);
 
-                if (existingScore != null)
+                if (existingScoreFallback != null)
                 {
                     // Update existing score
-                    existingScore.TotalScore = totalScore;
-                    existingScore.EducationScore = educationScore;
-                    existingScore.ExperienceScore = experienceScore;
-                    existingScore.SkillsScore = skillsScore;
-                    existingScore.ScoredAt = DateTime.UtcNow;
+                    existingScoreFallback.TotalScore = totalScore;
+                    existingScoreFallback.EducationScore = educationScoreFallback;
+                    existingScoreFallback.ExperienceScore = experienceScoreFallback;
+                    existingScoreFallback.SkillsScore = skillsScoreFallback;
+                    existingScoreFallback.ScoredAt = DateTime.UtcNow;
                 }
                 else
                 {
                     // Create new score
-                    var score = new ResumeScore
+                    var scoreFallback = new ResumeScore
                     {
                         ResumeId = resumeId,
                         JobId = jobId,
                         TotalScore = totalScore,
-                        EducationScore = educationScore,
-                        ExperienceScore = experienceScore,
-                        SkillsScore = skillsScore,
+                        EducationScore = educationScoreFallback,
+                        ExperienceScore = experienceScoreFallback,
+                        SkillsScore = skillsScoreFallback,
                         ScoredAt = DateTime.UtcNow
                     };
 
-                    _context.ResumeScores.Add(score);
+                    _context.ResumeScores.Add(scoreFallback);
                 }
 
                 await _context.SaveChangesAsync();
@@ -134,11 +205,12 @@ namespace ResumeScoring.Api.Controllers
                     resumeId,
                     jobId,
                     totalScore = Math.Round(totalScore, 2),
-                    educationScore = Math.Round(educationScore, 2),
-                    experienceScore = Math.Round(experienceScore, 2),
-                    skillsScore = Math.Round(skillsScore, 2),
-                    usedParsedData = parsedData != null && !string.IsNullOrEmpty(parsedData.Skills),
-                    message = "Resume scored successfully"
+                    educationScore = Math.Round(educationScoreFallback, 2),
+                    experienceScore = Math.Round(experienceScoreFallback, 2),
+                    skillsScore = Math.Round(skillsScoreFallback, 2),
+                    usedParsedData = parsedDataFallback != null && !string.IsNullOrEmpty(parsedDataFallback.Skills),
+                    usedSemanticSimilarity = false,
+                    message = "⚠️ Used fallback scoring (no embeddings available)"
                 });
             }
             catch (Exception ex)
@@ -162,9 +234,9 @@ namespace ResumeScoring.Api.Controllers
                 }
 
                 var resumes = await _context.Resumes.ToListAsync();
-                var parsedDataDict = await _context.ParsedData
+                var parsedDataDict = await _context.ParsedDatas
                     .Where(pd => pd.Skills != null)
-                    .ToDictionaryAsync(pd => pd.ResumeId);
+                    .ToDictionaryAsync(pd => pd.ResumeId!.Value);
 
                 var results = new List<object>();
                 var weights = ParseWeightConfig(job.WeightConfig);
@@ -290,7 +362,7 @@ namespace ResumeScoring.Api.Controllers
         {
             if (string.IsNullOrEmpty(parsedData.Education))
             {
-                return 50m; // Default score if no education data
+                return 60m; // Default score if no education data
             }
 
             try
@@ -352,13 +424,13 @@ namespace ResumeScoring.Api.Controllers
         {
             if (string.IsNullOrEmpty(parsedData.Experience))
             {
-                return 40m; // Default score if no experience data
+                return 50m; // Default score if no experience data
             }
 
             try
             {
                 var experienceArray = JsonSerializer.Deserialize<JsonElement>(parsedData.Experience);
-                
+
                 if (experienceArray.ValueKind != JsonValueKind.Array)
                 {
                     return 40m;
@@ -366,7 +438,7 @@ namespace ResumeScoring.Api.Controllers
 
                 decimal score = 40m; // Base score
                 int jobCount = experienceArray.GetArrayLength();
-                
+
                 // Score based on number of positions
                 score += Math.Min(jobCount * 10m, 30m);
 
@@ -374,8 +446,8 @@ namespace ResumeScoring.Api.Controllers
                 foreach (var exp in experienceArray.EnumerateArray())
                 {
                     var expText = exp.ToString().ToLower();
-                    
-                    if (expText.Contains("senior") || expText.Contains("lead") || 
+
+                    if (expText.Contains("senior") || expText.Contains("lead") ||
                         expText.Contains("principal") || expText.Contains("architect"))
                     {
                         score += 10m;
@@ -394,12 +466,12 @@ namespace ResumeScoring.Api.Controllers
                 return 40m;
             }
         }
-
+        
         private decimal CalculateSkillsScoreFromParsedData(ParsedData parsedData, Job job)
         {
             if (string.IsNullOrEmpty(parsedData.Skills))
             {
-                return 30m; // Default score if no skills data
+                return 40m;
             }
 
             try
@@ -409,12 +481,11 @@ namespace ResumeScoring.Api.Controllers
 
                 if (string.IsNullOrEmpty(requiredSkillsText))
                 {
-                    return 50m; // If no required skills specified, give moderate score
+                    return 50m;
                 }
 
-                // Extract all skills from the JSON (organized by category)
+                // Extract all candidate skills
                 var candidateSkills = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
                 if (skillsObject.ValueKind == JsonValueKind.Object)
                 {
                     foreach (var category in skillsObject.EnumerateObject())
@@ -445,12 +516,21 @@ namespace ResumeScoring.Api.Controllers
                     return 50m;
                 }
 
-                // Count matching skills with fuzzy matching
-                var matchingSkills = requiredSkills.Count(required => 
-                    candidateSkills.Any(candidate => 
-                        candidate.Contains(required) || required.Contains(candidate)
-                    )
-                );
+                // IMPROVED: Better fuzzy matching with synonym support
+                var matchingSkills = 0;
+                foreach (var required in requiredSkills)
+                {
+                    var matched = candidateSkills.Any(candidate => 
+                        // Exact match
+                        candidate == required ||
+                        // Contains match
+                        candidate.Contains(required) || required.Contains(candidate) ||
+                        // Synonym matches
+                        AreSynonyms(candidate, required)
+                    );
+                    
+                    if (matched) matchingSkills++;
+                }
 
                 var matchPercentage = (decimal)matchingSkills / requiredSkills.Count;
                 var score = matchPercentage * 100m;
@@ -464,6 +544,39 @@ namespace ResumeScoring.Api.Controllers
                 _logger.LogWarning($"Error parsing skills data: {ex.Message}");
                 return 30m;
             }
+        }
+
+        // NEW: Add synonym checking
+        private bool AreSynonyms(string skill1, string skill2)
+        {
+            var synonymMap = new Dictionary<string, List<string>>
+            {
+                {"javascript", new List<string>{"js", "es6", "es2015", "ecmascript"}},
+                {"react", new List<string>{"reactjs", "react.js"}},
+                {"node", new List<string>{"nodejs", "node.js"}},
+                {"next", new List<string>{"nextjs", "next.js"}},
+                {"vue", new List<string>{"vuejs", "vue.js"}},
+                {"postgresql", new List<string>{"postgres", "psql"}},
+                {"mongodb", new List<string>{"mongo"}},
+                {"aws", new List<string>{"amazon web services"}},
+                {"gcp", new List<string>{"google cloud", "google cloud platform"}},
+                {"kubernetes", new List<string>{"k8s"}},
+                {"tailwind", new List<string>{"tailwindcss", "tailwind css"}},
+                {"material-ui", new List<string>{"mui"}},
+            };
+
+            foreach (var entry in synonymMap)
+            {
+                var allForms = new List<string> { entry.Key };
+                allForms.AddRange(entry.Value);
+                
+                if (allForms.Contains(skill1) && allForms.Contains(skill2))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // ===== FALLBACK: Original keyword-based scoring methods =====
@@ -492,6 +605,109 @@ namespace ResumeScoring.Api.Controllers
             }
         }
 
+        private double CosineSimilarity(string vector1Json, string vector2Json)
+        {
+            try
+            {
+                // Parse JSON arrays to double arrays
+                var vec1 = JsonSerializer.Deserialize<double[]>(vector1Json);
+                var vec2 = JsonSerializer.Deserialize<double[]>(vector2Json);
+                
+                if (vec1 == null || vec2 == null)
+                {
+                    _logger.LogWarning("One or both vectors are null");
+                    return -1;
+                }
+                
+                if (vec1.Length != vec2.Length)
+                {
+                    _logger.LogWarning($"Vector length mismatch: {vec1.Length} vs {vec2.Length}");
+                    return -1;
+                }
+                
+                // Calculate dot product and magnitudes
+                double dotProduct = 0;
+                double magnitude1 = 0;
+                double magnitude2 = 0;
+                
+                for (int i = 0; i < vec1.Length; i++)
+                {
+                    dotProduct += vec1[i] * vec2[i];
+                    magnitude1 += vec1[i] * vec1[i];
+                    magnitude2 += vec2[i] * vec2[i];
+                }
+                
+                magnitude1 = Math.Sqrt(magnitude1);
+                magnitude2 = Math.Sqrt(magnitude2);
+                
+                if (magnitude1 == 0 || magnitude2 == 0)
+                {
+                    return 0;
+                }
+                
+                // Cosine similarity formula: dot(A,B) / (||A|| * ||B||)
+                double similarity = dotProduct / (magnitude1 * magnitude2);
+                
+                return similarity;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error calculating cosine similarity: {ex.Message}");
+                return -1;
+            }
+        }
+
+        private async Task<decimal> CalculateSemanticScore(int resumeId, int jobId)
+        {
+            try
+            {
+                // Get resume embedding
+                var resumeEmbedding = await _context.Embeddings
+                    .Where(e => e.EntityType == "Resume" && e.EntityId == resumeId)
+                    .Select(e => e.VectorData)
+                    .FirstOrDefaultAsync();
+                
+                // Get job embedding
+                var job = await _context.Jobs.FindAsync(jobId);
+                var jobEmbedding = job?.EmbeddingVector;
+                
+                if (string.IsNullOrEmpty(resumeEmbedding))
+                {
+                    _logger.LogWarning($"No embedding found for resume {resumeId}");
+                    return -1;
+                }
+                
+                if (string.IsNullOrEmpty(jobEmbedding))
+                {
+                    _logger.LogWarning($"No embedding found for job {jobId}");
+                    return -1;
+                }
+                
+                // Calculate cosine similarity
+                var similarity = CosineSimilarity(resumeEmbedding, jobEmbedding);
+                
+                if (similarity < 0)
+                {
+                    _logger.LogWarning("Cosine similarity calculation failed");
+                    return -1;
+                }
+                
+                // Convert from [-1, 1] range to [0, 100] percentage
+                // similarity ranges from -1 (opposite) to 1 (identical)
+                // We normalize to 0-100 scale
+                var score = (decimal)((similarity + 1) / 2 * 100);
+                
+                _logger.LogInformation($"Semantic similarity: {similarity:F4} -> Score: {score:F2}%");
+                
+                return score;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error in CalculateSemanticScore: {ex.Message}");
+                return -1;
+            }
+        }
+                
         private decimal CalculateEducationScore(Resume resume)
         {
             var text = (resume.RawText ?? "").ToLower();
