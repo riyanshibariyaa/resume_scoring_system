@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ResumeScoring.Api.Data;
 
 namespace ResumeScoring.Api.Controllers;
 

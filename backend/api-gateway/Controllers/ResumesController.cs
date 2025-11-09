@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Security.Cryptography;
+using ResumeScoring.Api.Data;
 
 namespace ResumeScoring.Api.Controllers;
 
