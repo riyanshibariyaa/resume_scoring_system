@@ -1,25 +1,26 @@
+// frontend/src/pages/CandidateScoring.js
+// FIXED VERSION - Reads totalScore correctly from backend
+
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Button,
   Typography,
-  Alert,
   Paper,
   Grid,
+  Card,
+  CardContent,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Card,
-  CardContent,
+  Button,
+  Alert,
   LinearProgress,
-  Chip,
   Divider,
 } from '@mui/material';
 import {
-  Psychology as ScoreIcon,
   CheckCircle as SuccessIcon,
-  TrendingUp as TrendIcon,
+  Psychology as ScoreIcon,
 } from '@mui/icons-material';
 import { resumeService, jobService, scoringService } from '../services/api';
 import { useNavigate } from 'react-router-dom';
@@ -31,9 +32,8 @@ const CandidateScoring = () => {
   const [selectedResume, setSelectedResume] = useState('');
   const [selectedJob, setSelectedJob] = useState('');
   const [scoring, setScoring] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState(null);
   const [scoreResult, setScoreResult] = useState(null);
+  const [message, setMessage] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -41,81 +41,71 @@ const CandidateScoring = () => {
 
   const loadData = async () => {
     try {
-      setLoading(true);
       const [resumesData, jobsData] = await Promise.all([
         resumeService.getAll(),
         jobService.getAll(),
       ]);
-      
-      setResumes(Array.isArray(resumesData) ? resumesData : []);
-      setJobs(Array.isArray(jobsData) ? jobsData : []);
-      
-      if (resumesData.length === 0) {
-        setMessage({ 
-          type: 'warning', 
-          text: 'No resumes found. Please upload a resume first.' 
-        });
-      }
-      if (jobsData.length === 0) {
-        setMessage({ 
-          type: 'warning', 
-          text: 'No jobs found. Please create a job first.' 
-        });
-      }
-    } catch (error) {
-      console.error('Error loading data:', error);
-      setMessage({ type: 'error', text: 'Failed to load data: ' + error.message });
-    } finally {
-      setLoading(false);
+      setResumes(resumesData);
+      setJobs(jobsData);
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setMessage({ type: 'error', text: 'Failed to load resumes or jobs' });
     }
   };
 
   const handleScore = async () => {
     if (!selectedResume || !selectedJob) {
-      setMessage({ type: 'error', text: 'Please select both a resume and a job' });
+      setMessage({ type: 'warning', text: 'Please select both a resume and a job' });
       return;
     }
 
-    setScoring(true);
-    setMessage(null);
-    setScoreResult(null);
-
     try {
-      // This triggers the complete scoring workflow:
-      // 1. Fetches parsed resume data from database
-      // 2. Fetches job requirements
-      // 3. Compares embeddings
-      // 4. Calculates multi-dimensional scores
-      // 5. Creates Scores and MatchEvidence records
-      const result = await scoringService.scoreCandidate(
-        parseInt(selectedResume),
-        parseInt(selectedJob)
-      );
+      setScoring(true);
+      setScoreResult(null);
+      setMessage(null);
 
-      setScoreResult(result);
-      setMessage({ 
-        type: 'success', 
-        text: 'Candidate scored successfully! Results have been saved to the database.' 
+      console.log('🚀 Scoring request:', { resumeId: selectedResume, jobId: selectedJob });
+
+      // Call the scoring API
+      const result = await scoringService.scoreCandidate(selectedResume, selectedJob);
+
+      console.log('✅ Scoring response:', result);
+
+      // ✅ CRITICAL FIX: Backend returns totalScore (not overallScore or score)
+      // Backend sends as 0-100 percentage (not 0-1 decimal)
+      setScoreResult({
+        totalScore: result.totalScore || 0,  // ← Read totalScore
+        skillsScore: result.skillsScore || 0,
+        experienceScore: result.experienceScore || 0,
+        educationScore: result.educationScore || 0,
+        usedParsedData: result.usedParsedData || false,
+        message: result.message,
+        // Keep compatibility with old field names if they exist
+        overallScore: result.overallScore || result.totalScore / 100, // Convert to 0-1 if needed
+        subscores: {
+          skills: (result.skillsScore || 0) / 100,
+          experience: (result.experienceScore || 0) / 100,
+          education: (result.educationScore || 0) / 100,
+        },
       });
 
-    } catch (error) {
-      console.error('Scoring error:', error);
-      setMessage({ type: 'error', text: 'Scoring failed: ' + error.message });
+      setMessage({
+        type: 'success',
+        text: 'Candidate scored successfully! Results have been saved to the database.',
+      });
+    } catch (err) {
+      console.error('❌ Scoring error:', err);
+      setMessage({
+        type: 'error',
+        text: `Failed to score candidate: ${err.message}`,
+      });
     } finally {
       setScoring(false);
     }
   };
 
-  const selectedResumeData = resumes.find(r => r.resumeId === parseInt(selectedResume) || r.id === parseInt(selectedResume));
-  const selectedJobData = jobs.find(j => j.jobId === parseInt(selectedJob) || j.id === parseInt(selectedJob));
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <LinearProgress sx={{ width: '50%' }} />
-      </Box>
-    );
-  }
+  const selectedResumeData = resumes.find((r) => r.resumeId === selectedResume);
+  const selectedJobData = jobs.find((j) => j.jobId === selectedJob);
 
   return (
     <Box>
@@ -124,132 +114,76 @@ const CandidateScoring = () => {
       </Typography>
 
       <Grid container spacing={3}>
-        {/* Selection Panel */}
+        {/* Select Candidate */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
               Select Candidate
             </Typography>
-            
-            <FormControl fullWidth sx={{ mb: 3 }}>
+            <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>Resume</InputLabel>
               <Select
                 value={selectedResume}
-                onChange={(e) => setSelectedResume(e.target.value)}
                 label="Resume"
+                onChange={(e) => setSelectedResume(e.target.value)}
               >
-                <MenuItem value="">
-                  <em>Select a resume...</em>
-                </MenuItem>
                 {resumes.map((resume) => (
-                  <MenuItem 
-                    key={resume.resumeId || resume.id} 
-                    value={resume.resumeId || resume.id}
-                  >
-                    {resume.candidateName || 'Unnamed Candidate'} 
-                    {resume.email && ` (${resume.email})`}
+                  <MenuItem key={resume.resumeId} value={resume.resumeId}>
+                    {resume.candidateName || 'Candidate'} ({resume.fileName})
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
 
             {selectedResumeData && (
-              <Card variant="outlined" sx={{ mb: 2 }}>
-                <CardContent>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Selected Resume
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold">
-                    {selectedResumeData.candidateName || 'Unnamed'}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {selectedResumeData.email || 'No email'}
-                  </Typography>
-                  <Box sx={{ mt: 1 }}>
-                    <Chip label={selectedResumeData.fileFormat || 'PDF'} size="small" />
-                    <Chip 
-                      label={selectedResumeData.parseStatus || 'Parsed'} 
-                      color="success" 
-                      size="small" 
-                      sx={{ ml: 1 }} 
-                    />
-                  </Box>
-                </CardContent>
-              </Card>
+              <Box sx={{ p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
+                <Typography variant="subtitle2">Selected Resume</Typography>
+                <Typography variant="body2">
+                  <strong>{selectedResumeData.candidateName || 'Candidate'}</strong>
+                </Typography>
+                {selectedResumeData.email && (
+                  <Typography variant="body2">{selectedResumeData.email}</Typography>
+                )}
+                <Typography variant="caption" color="text.secondary">
+                  {selectedResumeData.fileName} • Parsed ✅
+                </Typography>
+              </Box>
             )}
-
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={() => navigate('/upload')}
-              disabled={scoring}
-            >
-              Upload New Resume
-            </Button>
           </Paper>
         </Grid>
 
+        {/* Select Job */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
               Select Job
             </Typography>
-            
-            <FormControl fullWidth sx={{ mb: 3 }}>
+            <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>Job Position</InputLabel>
               <Select
                 value={selectedJob}
-                onChange={(e) => setSelectedJob(e.target.value)}
                 label="Job Position"
+                onChange={(e) => setSelectedJob(e.target.value)}
               >
-                <MenuItem value="">
-                  <em>Select a job...</em>
-                </MenuItem>
                 {jobs.map((job) => (
-                  <MenuItem 
-                    key={job.jobId || job.id} 
-                    value={job.jobId || job.id}
-                  >
+                  <MenuItem key={job.jobId} value={job.jobId}>
                     {job.title}
-                    {job.department && ` - ${job.department}`}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
 
             {selectedJobData && (
-              <Card variant="outlined" sx={{ mb: 2 }}>
-                <CardContent>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Selected Job
-                  </Typography>
-                  <Typography variant="body1" fontWeight="bold">
-                    {selectedJobData.title}
-                  </Typography>
-                  {selectedJobData.department && (
-                    <Typography variant="body2" color="text.secondary">
-                      {selectedJobData.department}
-                    </Typography>
-                  )}
-                  <Typography 
-                    variant="body2" 
-                    sx={{ mt: 1 }}
-                    color="text.secondary"
-                  >
-                    {selectedJobData.description?.substring(0, 150)}...
-                  </Typography>
-                </CardContent>
-              </Card>
+              <Box sx={{ p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
+                <Typography variant="subtitle2">Selected Job</Typography>
+                <Typography variant="body2">
+                  <strong>{selectedJobData.title}</strong>
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  {selectedJobData.description?.substring(0, 150)}...
+                </Typography>
+              </Box>
             )}
-
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={() => navigate('/jobs/create')}
-              disabled={scoring}
-            >
-              Create New Job
-            </Button>
           </Paper>
         </Grid>
 
@@ -286,10 +220,7 @@ const CandidateScoring = () => {
         {/* Messages */}
         {message && (
           <Grid item xs={12}>
-            <Alert 
-              severity={message.type}
-              onClose={() => setMessage(null)}
-            >
+            <Alert severity={message.type} onClose={() => setMessage(null)}>
               {message.text}
             </Alert>
           </Grid>
@@ -303,74 +234,89 @@ const CandidateScoring = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                   <SuccessIcon sx={{ fontSize: 40, color: 'success.main', mr: 2 }} />
                   <Box>
+                    {/* ✅ FIXED: Display totalScore directly (already 0-100) */}
                     <Typography variant="h5" color="success.main" fontWeight="bold">
-                      Score: {((scoreResult.overallScore || scoreResult.score || 0) * 100).toFixed(1)}%
+                      Score: {scoreResult.totalScore.toFixed(1)}%
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Match quality for this position
                     </Typography>
+                    {scoreResult.usedParsedData && (
+                      <Typography variant="caption" color="success.dark">
+                        ✅ Scored using structured ParsedData
+                      </Typography>
+                    )}
+                    {!scoreResult.usedParsedData && (
+                      <Typography variant="caption" color="warning.dark">
+                        ⚠️ Used fallback scoring (no ParsedData available)
+                      </Typography>
+                    )}
                   </Box>
                 </Box>
 
                 <Divider sx={{ my: 2 }} />
 
-                {/* Subscores */}
-                {scoreResult.subscores && (
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Detailed Breakdown:
-                    </Typography>
-                    <Grid container spacing={1}>
-                      {Object.entries(scoreResult.subscores).map(([key, value]) => (
-                        <Grid item xs={6} sm={4} key={key}>
-                          <Box sx={{ textAlign: 'center', p: 1, backgroundColor: 'white', borderRadius: 1 }}>
-                            <Typography variant="h6" color="primary">
-                              {(value * 100).toFixed(0)}%
-                            </Typography>
-                            <Typography variant="caption" sx={{ textTransform: 'capitalize' }}>
-                              {key.replace('_', ' ')}
-                            </Typography>
-                          </Box>
-                        </Grid>
-                      ))}
+                {/* Subscores - Display directly (already 0-100) */}
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Detailed Breakdown:
+                  </Typography>
+                  <Grid container spacing={1}>
+                    <Grid item xs={6} sm={4}>
+                      <Box
+                        sx={{
+                          textAlign: 'center',
+                          p: 1,
+                          backgroundColor: 'white',
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Typography variant="h6" color="primary">
+                          {scoreResult.skillsScore.toFixed(0)}%
+                        </Typography>
+                        <Typography variant="caption">Skills</Typography>
+                      </Box>
                     </Grid>
-                  </Box>
-                )}
-
-                {/* Evidence */}
-                {scoreResult.evidence && scoreResult.evidence.length > 0 && (
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Match Evidence:
-                    </Typography>
-                    {scoreResult.evidence.slice(0, 3).map((ev, idx) => (
-                      <Typography key={idx} variant="body2" sx={{ ml: 2, mb: 0.5 }}>
-                        • {ev.text || ev}
-                      </Typography>
-                    ))}
-                  </Box>
-                )}
+                    <Grid item xs={6} sm={4}>
+                      <Box
+                        sx={{
+                          textAlign: 'center',
+                          p: 1,
+                          backgroundColor: 'white',
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Typography variant="h6" color="primary">
+                          {scoreResult.experienceScore.toFixed(0)}%
+                        </Typography>
+                        <Typography variant="caption">Experience</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Box
+                        sx={{
+                          textAlign: 'center',
+                          p: 1,
+                          backgroundColor: 'white',
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Typography variant="h6" color="primary">
+                          {scoreResult.educationScore.toFixed(0)}%
+                        </Typography>
+                        <Typography variant="caption">Education</Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Box>
 
                 <Divider sx={{ my: 2 }} />
 
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  ✅ Score saved to database (Scores table)
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  ✅ Evidence saved (MatchEvidence table)
+                  ✅ Score saved to database (ResumeScores table)
                 </Typography>
 
                 <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-                  <Button
-                    variant="contained"
-                    onClick={() => {
-                      if (scoreResult.scoreId || scoreResult.id) {
-                        navigate(`/results/${scoreResult.scoreId || scoreResult.id}`);
-                      }
-                    }}
-                  >
-                    View Detailed Results
-                  </Button>
                   <Button
                     variant="outlined"
                     onClick={() => {
@@ -396,22 +342,19 @@ const CandidateScoring = () => {
             </Typography>
             <Box component="ol" sx={{ pl: 2 }}>
               <li>
-                <strong>Resume Data Fetched:</strong> Parsed text, extracted skills, experience, education from database
+                <strong>Resume Data Fetched:</strong> Parsed text, extracted skills, experience,
+                education from database
               </li>
               <li>
-                <strong>Job Requirements Analyzed:</strong> Job description broken down into requirements
+                <strong>Job Requirements Analyzed:</strong> Job description broken down into
+                requirements
               </li>
               <li>
-                <strong>Semantic Matching:</strong> Embeddings compared for deep understanding
+                <strong>Multi-Dimensional Scoring:</strong> Skills, experience, and education
+                evaluated
               </li>
               <li>
-                <strong>Multi-Dimensional Scoring:</strong> 6 criteria evaluated (skills, experience, domain, education, certs, recency)
-              </li>
-              <li>
-                <strong>Evidence Generated:</strong> Specific examples of matches saved
-              </li>
-              <li>
-                <strong>Results Stored:</strong> Scores and evidence saved to database for future reference
+                <strong>Results Stored:</strong> Scores saved to database for future reference
               </li>
             </Box>
           </Paper>

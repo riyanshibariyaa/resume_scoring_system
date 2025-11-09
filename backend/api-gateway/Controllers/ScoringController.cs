@@ -17,7 +17,8 @@ namespace ResumeScoring.Api.Controllers
             _context = context;
             _logger = logger;
         }
-// DTO used for the POST body
+
+        // DTO used for the POST body
         public class ScoreRequest
         {
             public int ResumeId { get; set; }
@@ -28,13 +29,13 @@ namespace ResumeScoring.Api.Controllers
         /// Accepts POST /api/v1/scoring with body { resumeId, jobId } and runs scoring.
         /// This provides a simple endpoint your frontend can call.
         /// </summary>
-        [HttpPost]                 // matches POST api/v1/scoring
+        [HttpPost]  // This matches POST api/v1/scoring
         public async Task<IActionResult> CreateScore([FromBody] ScoreRequest request)
         {
             if (request == null)
                 return BadRequest(new { error = "Request body is required: { resumeId, jobId }" });
 
-            // Reuse existing action. If ScoreResume performs extra behavior (logging, validation), it'll run as before.
+            // Reuse existing action
             return await ScoreResume(request.ResumeId, request.JobId);
         }
 
@@ -45,12 +46,16 @@ namespace ResumeScoring.Api.Controllers
             {
                 _logger.LogInformation($"Scoring resume {resumeId} against job {jobId}");
 
-                // Get resume
+                // Get resume with parsed data
                 var resume = await _context.Resumes.FindAsync(resumeId);
                 if (resume == null)
                 {
                     return NotFound(new { message = "Resume not found" });
                 }
+
+                var parsedData = await _context.ParsedData
+                    .Where(pd => pd.ResumeId == resumeId)
+                    .FirstOrDefaultAsync();
 
                 // Get job
                 var job = await _context.Jobs.FindAsync(jobId);
@@ -62,10 +67,27 @@ namespace ResumeScoring.Api.Controllers
                 // Parse weight config
                 var weights = ParseWeightConfig(job.WeightConfig);
 
-                // Calculate scores
-                var educationScore = CalculateEducationScore(resume);
-                var experienceScore = CalculateExperienceScore(resume);
-                var skillsScore = CalculateSkillsScore(resume, job);
+                // Calculate scores using ParsedData if available, fallback to RawText
+                decimal educationScore;
+                decimal experienceScore;
+                decimal skillsScore;
+
+                if (parsedData != null && !string.IsNullOrEmpty(parsedData.Skills))
+                {
+                    // Use structured data for better scoring
+                    educationScore = CalculateEducationScoreFromParsedData(parsedData);
+                    experienceScore = CalculateExperienceScoreFromParsedData(parsedData);
+                    skillsScore = CalculateSkillsScoreFromParsedData(parsedData, job);
+                    _logger.LogInformation("Using ParsedData for scoring");
+                }
+                else
+                {
+                    // Fallback to basic keyword-based scoring
+                    educationScore = CalculateEducationScore(resume);
+                    experienceScore = CalculateExperienceScore(resume);
+                    skillsScore = CalculateSkillsScore(resume, job);
+                    _logger.LogWarning($"No ParsedData found for resume {resumeId}, using fallback scoring");
+                }
 
                 // Calculate weighted total
                 var totalScore = 
@@ -115,6 +137,7 @@ namespace ResumeScoring.Api.Controllers
                     educationScore = Math.Round(educationScore, 2),
                     experienceScore = Math.Round(experienceScore, 2),
                     skillsScore = Math.Round(skillsScore, 2),
+                    usedParsedData = parsedData != null && !string.IsNullOrEmpty(parsedData.Skills),
                     message = "Resume scored successfully"
                 });
             }
@@ -139,14 +162,32 @@ namespace ResumeScoring.Api.Controllers
                 }
 
                 var resumes = await _context.Resumes.ToListAsync();
+                var parsedDataDict = await _context.ParsedData
+                    .Where(pd => pd.Skills != null)
+                    .ToDictionaryAsync(pd => pd.ResumeId);
+
                 var results = new List<object>();
+                var weights = ParseWeightConfig(job.WeightConfig);
 
                 foreach (var resume in resumes)
                 {
-                    var weights = ParseWeightConfig(job.WeightConfig);
-                    var educationScore = CalculateEducationScore(resume);
-                    var experienceScore = CalculateExperienceScore(resume);
-                    var skillsScore = CalculateSkillsScore(resume, job);
+                    decimal educationScore;
+                    decimal experienceScore;
+                    decimal skillsScore;
+
+                    if (parsedDataDict.TryGetValue(resume.ResumeId, out var parsedData))
+                    {
+                        educationScore = CalculateEducationScoreFromParsedData(parsedData);
+                        experienceScore = CalculateExperienceScoreFromParsedData(parsedData);
+                        skillsScore = CalculateSkillsScoreFromParsedData(parsedData, job);
+                    }
+                    else
+                    {
+                        educationScore = CalculateEducationScore(resume);
+                        experienceScore = CalculateExperienceScore(resume);
+                        skillsScore = CalculateSkillsScore(resume, job);
+                    }
+
                     var totalScore = 
                         (educationScore * weights.Education) +
                         (experienceScore * weights.Experience) +
@@ -232,7 +273,6 @@ namespace ResumeScoring.Api.Controllers
                         skillsScore = Math.Round(s.SkillsScore, 2),
                         scoredAt = s.ScoredAt
                     })
-
                     .ToListAsync();
 
                 return Ok(scores);
@@ -243,6 +283,191 @@ namespace ResumeScoring.Api.Controllers
                 return StatusCode(500, new { message = "Error fetching scores", error = ex.Message });
             }
         }
+
+        // ===== ParsedData-based scoring methods (NEW) =====
+
+        private decimal CalculateEducationScoreFromParsedData(ParsedData parsedData)
+        {
+            if (string.IsNullOrEmpty(parsedData.Education))
+            {
+                return 50m; // Default score if no education data
+            }
+
+            try
+            {
+                var educationArray = JsonSerializer.Deserialize<JsonElement>(parsedData.Education);
+                
+                if (educationArray.ValueKind != JsonValueKind.Array)
+                {
+                    return 50m;
+                }
+
+                decimal score = 50m; // Base score
+                bool hasBachelor = false;
+                bool hasMaster = false;
+                bool hasPhd = false;
+
+                foreach (var edu in educationArray.EnumerateArray())
+                {
+                    var degreeText = edu.ToString().ToLower();
+
+                    if (degreeText.Contains("bachelor") || degreeText.Contains("b.tech") || 
+                        degreeText.Contains("b.e") || degreeText.Contains("bsc") || degreeText.Contains("b.s"))
+                    {
+                        if (!hasBachelor)
+                        {
+                            hasBachelor = true;
+                            score += 15m;
+                        }
+                    }
+                    else if (degreeText.Contains("master") || degreeText.Contains("m.tech") || 
+                             degreeText.Contains("msc") || degreeText.Contains("mba") || degreeText.Contains("m.s"))
+                    {
+                        if (!hasMaster)
+                        {
+                            hasMaster = true;
+                            score += 20m;
+                        }
+                    }
+                    else if (degreeText.Contains("phd") || degreeText.Contains("doctorate") || degreeText.Contains("ph.d"))
+                    {
+                        if (!hasPhd)
+                        {
+                            hasPhd = true;
+                            score += 25m;
+                        }
+                    }
+                }
+
+                return Math.Min(score, 100m);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Error parsing education data: {ex.Message}");
+                return 50m;
+            }
+        }
+
+        private decimal CalculateExperienceScoreFromParsedData(ParsedData parsedData)
+        {
+            if (string.IsNullOrEmpty(parsedData.Experience))
+            {
+                return 40m; // Default score if no experience data
+            }
+
+            try
+            {
+                var experienceArray = JsonSerializer.Deserialize<JsonElement>(parsedData.Experience);
+                
+                if (experienceArray.ValueKind != JsonValueKind.Array)
+                {
+                    return 40m;
+                }
+
+                decimal score = 40m; // Base score
+                int jobCount = experienceArray.GetArrayLength();
+                
+                // Score based on number of positions
+                score += Math.Min(jobCount * 10m, 30m);
+
+                // Analyze experience content
+                foreach (var exp in experienceArray.EnumerateArray())
+                {
+                    var expText = exp.ToString().ToLower();
+                    
+                    if (expText.Contains("senior") || expText.Contains("lead") || 
+                        expText.Contains("principal") || expText.Contains("architect"))
+                    {
+                        score += 10m;
+                    }
+                    else if (expText.Contains("manager") || expText.Contains("director"))
+                    {
+                        score += 8m;
+                    }
+                }
+
+                return Math.Min(score, 100m);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Error parsing experience data: {ex.Message}");
+                return 40m;
+            }
+        }
+
+        private decimal CalculateSkillsScoreFromParsedData(ParsedData parsedData, Job job)
+        {
+            if (string.IsNullOrEmpty(parsedData.Skills))
+            {
+                return 30m; // Default score if no skills data
+            }
+
+            try
+            {
+                var skillsObject = JsonSerializer.Deserialize<JsonElement>(parsedData.Skills);
+                var requiredSkillsText = (job.RequiredSkills ?? "").ToLower();
+
+                if (string.IsNullOrEmpty(requiredSkillsText))
+                {
+                    return 50m; // If no required skills specified, give moderate score
+                }
+
+                // Extract all skills from the JSON (organized by category)
+                var candidateSkills = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                if (skillsObject.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var category in skillsObject.EnumerateObject())
+                    {
+                        if (category.Value.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var skill in category.Value.EnumerateArray())
+                            {
+                                var skillName = skill.GetString();
+                                if (!string.IsNullOrEmpty(skillName))
+                                {
+                                    candidateSkills.Add(skillName.ToLower().Trim());
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Parse required skills
+                var requiredSkills = requiredSkillsText
+                    .Split(new[] { ',', ';', '\n', '|' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim().ToLower())
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .ToList();
+
+                if (requiredSkills.Count == 0)
+                {
+                    return 50m;
+                }
+
+                // Count matching skills with fuzzy matching
+                var matchingSkills = requiredSkills.Count(required => 
+                    candidateSkills.Any(candidate => 
+                        candidate.Contains(required) || required.Contains(candidate)
+                    )
+                );
+
+                var matchPercentage = (decimal)matchingSkills / requiredSkills.Count;
+                var score = matchPercentage * 100m;
+
+                _logger.LogInformation($"Skills match: {matchingSkills}/{requiredSkills.Count} = {score:F2}%");
+
+                return score;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Error parsing skills data: {ex.Message}");
+                return 30m;
+            }
+        }
+
+        // ===== FALLBACK: Original keyword-based scoring methods =====
+
         private (decimal Education, decimal Experience, decimal Skills) ParseWeightConfig(string? weightConfig)
         {
             try
@@ -267,82 +492,52 @@ namespace ResumeScoring.Api.Controllers
             }
         }
 
-        // private (decimal Education, decimal Experience, decimal Skills) ParseWeightConfig(string weightConfig)
-        // {
-        //     try
-        //     {
-        //         if (string.IsNullOrEmpty(weightConfig))
-        //         {
-        //             return (0.25m, 0.35m, 0.40m); // Default weights
-        //         }
-
-        //         var weights = JsonSerializer.Deserialize<Dictionary<string, decimal>>(weightConfig);
-        //         return (
-        //             weights.GetValueOrDefault("education", 0.25m),
-        //             weights.GetValueOrDefault("experience", 0.35m),
-        //             weights.GetValueOrDefault("skills", 0.40m)
-        //         );
-        //     }
-        //     catch
-        //     {
-        //         return (0.25m, 0.35m, 0.40m); // Default weights on error
-        //     }
-        // }
-
         private decimal CalculateEducationScore(Resume resume)
         {
-            // Simple scoring based on education keywords
             var text = (resume.RawText ?? "").ToLower();
-            decimal score = 50; // Base score
+            decimal score = 50m;
 
-            // Degree keywords
             if (text.Contains("bachelor") || text.Contains("b.tech") || text.Contains("b.e") || text.Contains("bsc"))
-                score += 15;
+                score += 15m;
             if (text.Contains("master") || text.Contains("m.tech") || text.Contains("msc") || text.Contains("mba"))
-                score += 20;
+                score += 20m;
             if (text.Contains("phd") || text.Contains("doctorate"))
-                score += 25;
-
-            // Institution quality indicators
+                score += 25m;
             if (text.Contains("university") || text.Contains("college") || text.Contains("institute"))
-                score += 10;
+                score += 10m;
 
-            return Math.Min(score, 100);
+            return Math.Min(score, 100m);
         }
 
         private decimal CalculateExperienceScore(Resume resume)
         {
-            // Simple scoring based on experience keywords
             var text = (resume.RawText ?? "").ToLower();
-            decimal score = 40; // Base score
+            decimal score = 40m;
 
-            // Experience indicators
             if (text.Contains("years") || text.Contains("year"))
-                score += 20;
+                score += 20m;
             if (text.Contains("experience"))
-                score += 15;
+                score += 15m;
             if (text.Contains("worked") || text.Contains("working"))
-                score += 10;
+                score += 10m;
             if (text.Contains("senior") || text.Contains("lead") || text.Contains("manager"))
-                score += 15;
+                score += 15m;
             if (text.Contains("project") || text.Contains("projects"))
-                score += 10;
+                score += 10m;
 
-            return Math.Min(score, 100);
+            return Math.Min(score, 100m);
         }
 
         private decimal CalculateSkillsScore(Resume resume, Job job)
         {
-            // Compare resume skills with job requirements
             var resumeText = (resume.RawText ?? "").ToLower();
             var requiredSkills = (job.RequiredSkills ?? "").ToLower();
 
             if (string.IsNullOrEmpty(requiredSkills))
             {
-                return 50; // Default if no skills specified
+                return 50m;
             }
 
-            // Split required skills
             var skillKeywords = requiredSkills
                 .Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(s => s.Trim().ToLower())
@@ -351,14 +546,13 @@ namespace ResumeScoring.Api.Controllers
 
             if (skillKeywords.Count == 0)
             {
-                return 50;
+                return 50m;
             }
 
-            // Count matching skills
             var matchingSkills = skillKeywords.Count(skill => resumeText.Contains(skill));
             var matchPercentage = (decimal)matchingSkills / skillKeywords.Count;
 
-            return matchPercentage * 100;
+            return matchPercentage * 100m;
         }
     }
 }

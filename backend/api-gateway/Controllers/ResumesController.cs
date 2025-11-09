@@ -25,7 +25,7 @@ public class ResumesController : ControllerBase
     }
 
     /// <summary>
-    /// Upload resume - Complete workflow
+    /// Upload resume - Complete workflow with NLP extraction and ParsedData saving
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> UploadResume(IFormFile file)
@@ -37,7 +37,7 @@ public class ResumesController : ControllerBase
 
             _logger.LogInformation($"Processing resume upload: {file.FileName}");
 
-            // Step 1: Read file content
+            // Step 1: Read file content for RawText
             string rawText = "";
             using (var reader = new StreamReader(file.OpenReadStream()))
             {
@@ -47,6 +47,9 @@ public class ResumesController : ControllerBase
             // Step 2: Call Parsing Service
             var parsingClient = _clientFactory.CreateClient("ParsingService");
             var content = new MultipartFormDataContent();
+            
+            // Reset the stream position before creating new StreamContent
+            file.OpenReadStream().Position = 0;
             var fileContent = new StreamContent(file.OpenReadStream());
             fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
             content.Add(fileContent, "file", file.FileName);
@@ -57,39 +60,104 @@ public class ResumesController : ControllerBase
             string? candidateEmail = null;
             string? candidatePhone = null;
             
+            // Variables to hold ParsedData fields
+            string? parsedText = rawText;
+            string? sectionsJson = null;
+            string? metadataJson = null;
+            string? extractedProfileJson = null;
+            string? fileHash = null;
+            string? rawFilePath = null;
+            string? parsedFilePath = null;
+            string? skillsJson = null;
+            string? educationJson = null;
+            string? experienceJson = null;
+            string? certificationsJson = null;
+            string? summaryJson = null;
+
             if (parseResponse.IsSuccessStatusCode)
             {
                 var parseResultJson = await parseResponse.Content.ReadAsStringAsync();
+                _logger.LogInformation("Parsing service successful");
 
-                // parse into JsonDocument for safe traversal
+                // Parse into JsonDocument for safe traversal
                 using var doc = JsonDocument.Parse(parseResultJson);
                 var root = doc.RootElement;
 
-                // parsed_data object (parser returns parsed_data as a nested object)
+                // Extract file hash
+                if (root.TryGetProperty("file_hash", out var fh))
+                {
+                    fileHash = fh.GetString();
+                }
+
+                // Extract storage paths
+                if (root.TryGetProperty("storage", out var sto))
+                {
+                    if (sto.TryGetProperty("raw_file_path", out var rfp))
+                        rawFilePath = rfp.GetString();
+                    if (sto.TryGetProperty("parsed_file_path", out var pfp))
+                        parsedFilePath = pfp.GetString();
+                }
+
+                // Extract parsed_data object
                 if (root.TryGetProperty("parsed_data", out var parsedDataElement))
                 {
-                    // Try to extract contact info from parsed_data (parser or NLP may place it under contact_info)
-                    if (parsedDataElement.TryGetProperty("metadata", out var metadataEl))
+                    // Extract text
+                    if (parsedDataElement.TryGetProperty("text", out var t))
                     {
-                        // metadata may contain some fields, but contact likely comes from NLP service.
+                        parsedText = t.GetString() ?? rawText;
                     }
 
-                    // Optionally call NLP service to get structured profile (preferred)
+                    // Extract sections
+                    if (parsedDataElement.TryGetProperty("sections", out var s))
+                    {
+                        sectionsJson = s.GetRawText();
+                    }
+
+                    // Extract metadata
+                    if (parsedDataElement.TryGetProperty("metadata", out var m))
+                    {
+                        metadataJson = m.GetRawText();
+                    }
+
+                    // Step 3: Call NLP service to get structured profile
                     try
                     {
+                        // ✅ FIX: Create HTTP client with explicit BaseAddress
                         var nlpClient = _clientFactory.CreateClient();
-                        nlpClient.BaseAddress = new Uri("http://localhost:5002"); // NLP service
-                        var nlpPayload = new StringContent(JsonSerializer.Serialize(new { parsed_data = JsonSerializer.Deserialize<object>(parsedDataElement.GetRawText()) }), System.Text.Encoding.UTF8, "application/json");
-                        var nlpResp = await nlpClient.PostAsync("/extract", nlpPayload);
+                        nlpClient.BaseAddress = new Uri("http://localhost:5002");
+                        nlpClient.Timeout = TimeSpan.FromMinutes(2);
+                        
+                        var nlpPayload = new
+                        {
+                            parsed_data = new
+                            {
+                                text = parsedText  // Use parsedText, not rawText
+                            }
+                        };
+
+                        var nlpContent = new StringContent(
+                            JsonSerializer.Serialize(nlpPayload),
+                            System.Text.Encoding.UTF8,
+                            "application/json"
+                        );
+
+                        _logger.LogInformation("Calling NLP service...");
+                        var nlpResp = await nlpClient.PostAsync("/extract", nlpContent);
+                        
                         if (nlpResp.IsSuccessStatusCode)
                         {
                             var nlpJson = await nlpResp.Content.ReadAsStringAsync();
+                            _logger.LogInformation("NLP service successful");
+                            
                             using var nlpDoc = JsonDocument.Parse(nlpJson);
                             var nlpRoot = nlpDoc.RootElement;
 
                             if (nlpRoot.TryGetProperty("extracted_data", out var extractedData))
                             {
-                                // Try to set contact fields from extracted_data.contact_info
+                                // Store the entire extracted profile
+                                extractedProfileJson = extractedData.GetRawText();
+
+                                // Extract contact info
                                 if (extractedData.TryGetProperty("contact_info", out var contactInfo))
                                 {
                                     if (contactInfo.TryGetProperty("name", out var nameEl))
@@ -99,28 +167,57 @@ public class ResumesController : ControllerBase
                                     if (contactInfo.TryGetProperty("phone", out var phoneEl))
                                         candidatePhone = phoneEl.GetString();
                                 }
-
-                                // Save ParsedData record
-                                var parsedEntity = new ParsedData
+                                // Also try "contact" (alternative field name)
+                                else if (extractedData.TryGetProperty("contact", out var contact))
                                 {
-                                    ResumeId = null, // we'll attach after saving Resume
-                                    Text = parsedDataElement.TryGetProperty("text", out var t) ? t.GetString() : null,
-                                    SectionsJson = parsedDataElement.TryGetProperty("sections", out var s) ? s.GetRawText() : null,
-                                    MetadataJson = parsedDataElement.TryGetProperty("metadata", out var m) ? m.GetRawText() : null,
-                                    ExtractedProfileJson = extractedData.GetRawText(),
-                                    FileHash = root.TryGetProperty("file_hash", out var fh) ? fh.GetString() : null,
-                                    RawFilePath = root.TryGetProperty("storage", out var sto) && sto.TryGetProperty("raw_file_path", out var rfp) ? rfp.GetString() : null,
-                                    ParsedFilePath = root.TryGetProperty("storage", out var sto2) && sto2.TryGetProperty("parsed_file_path", out var pfp) ? pfp.GetString() : null,
-                                    ParsedAt = DateTime.UtcNow
-                                };
+                                    if (contact.TryGetProperty("name", out var nameEl))
+                                        candidateName = nameEl.GetString() ?? candidateName;
+                                    if (contact.TryGetProperty("email", out var emailEl))
+                                        candidateEmail = emailEl.GetString();
+                                    if (contact.TryGetProperty("phone", out var phoneEl))
+                                        candidatePhone = phoneEl.GetString();
+                                }
 
-                                // We'll set parsedEntity.ResumeId after saving Resume below
-                                // store it temporarily in a local variable to save after resume creation
-                                // (see below: after _context.Resumes.Add(resume) and SaveChanges, set parsedEntity.ResumeId = resume.ResumeId)
-                                // Save to DB after resume created
-                                // (we need to set after resume added, so we'll keep parsedEntity in a variable)
-                                // NOTE: we will save after resume is created (see later)
+                                // Extract skills
+                                if (extractedData.TryGetProperty("skills", out var skills))
+                                {
+                                    skillsJson = skills.GetRawText();
+                                    _logger.LogInformation($"Extracted skills JSON: {skillsJson.Substring(0, Math.Min(100, skillsJson.Length))}...");
+                                }
+
+                                // Extract education
+                                if (extractedData.TryGetProperty("education", out var education))
+                                {
+                                    educationJson = education.GetRawText();
+                                    _logger.LogInformation($"Extracted education JSON");
+                                }
+
+                                // Extract experience
+                                if (extractedData.TryGetProperty("experience", out var experience))
+                                {
+                                    experienceJson = experience.GetRawText();
+                                    _logger.LogInformation($"Extracted experience JSON");
+                                }
+
+                                // Extract certifications
+                                if (extractedData.TryGetProperty("certifications", out var certifications))
+                                {
+                                    certificationsJson = certifications.GetRawText();
+                                }
+
+                                // Extract summary
+                                if (extractedData.TryGetProperty("summary", out var summary))
+                                {
+                                    summaryJson = summary.GetRawText();
+                                }
+
+                                _logger.LogInformation($"Extracted: Name={candidateName}, Email={candidateEmail}, Phone={candidatePhone}");
                             }
+                        }
+                        else
+                        {
+                            var errorContent = await nlpResp.Content.ReadAsStringAsync();
+                            _logger.LogWarning($"NLP service failed with status {nlpResp.StatusCode}: {errorContent}");
                         }
                     }
                     catch (Exception ex)
@@ -129,36 +226,20 @@ public class ResumesController : ControllerBase
                     }
                 }
             }
+            else
+            {
+                var errorContent = await parseResponse.Content.ReadAsStringAsync();
+                _logger.LogWarning($"Parsing service failed: {errorContent}");
+            }
 
-
-            // if (parseResponse.IsSuccessStatusCode)
-            // {
-            //     var parseResult = await parseResponse.Content.ReadAsStringAsync();
-            //     // Try to extract name/email from parse result if available
-            //     try
-            //     {
-            //         var parsed = JsonSerializer.Deserialize<Dictionary<string, object>>(parseResult);
-            //         if (parsed != null)
-            //         {
-            //             if (parsed.ContainsKey("name")) 
-            //                 candidateName = parsed["name"]?.ToString() ?? "Candidate";
-            //             if (parsed.ContainsKey("email")) 
-            //                 candidateEmail = parsed["email"]?.ToString();
-            //             if (parsed.ContainsKey("phone"))
-            //                 candidatePhone = parsed["phone"]?.ToString();
-            //         }
-            //     }
-            //     catch { /* Use defaults if parsing fails */ }
-            // }
-
-            // Step 3: Store in Resumes table with ACTUAL database columns
+            // Step 4: Store in Resumes table
             var resume = new Resume
             {
                 CandidateName = candidateName,
                 Email = candidateEmail,
                 Phone = candidatePhone,
-                RawText = rawText,
-                FileHash = ComputeFileHash(file),
+                RawText = parsedText,
+                FileHash = fileHash ?? ComputeFileHash(file),
                 FileName = file.FileName,
                 FileType = Path.GetExtension(file.FileName).TrimStart('.').ToUpper(),
                 UploadedAt = DateTime.UtcNow,
@@ -170,6 +251,33 @@ public class ResumesController : ControllerBase
 
             _logger.LogInformation($"Resume created successfully: ID={resume.ResumeId}");
 
+            // Step 5: Save ParsedData record
+            var parsedDataEntity = new ParsedData
+            {
+                ResumeId = resume.ResumeId,
+                Text = parsedText,
+                SectionsJson = sectionsJson,
+                MetadataJson = metadataJson,
+                ExtractedProfileJson = extractedProfileJson,
+                Skills = skillsJson,
+                Education = educationJson,
+                Experience = experienceJson,
+                Certifications = certificationsJson,
+                Summary = summaryJson,
+                FileHash = fileHash,
+                RawFilePath = rawFilePath,
+                ParsedFilePath = parsedFilePath,
+                ParsedAt = DateTime.UtcNow
+            };
+
+            _context.ParsedData.Add(parsedDataEntity);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation($"ParsedData created successfully: ID={parsedDataEntity.ParsedDataId}");
+            _logger.LogInformation($"ParsedData has Skills: {!string.IsNullOrEmpty(skillsJson)}");
+            _logger.LogInformation($"ParsedData has Experience: {!string.IsNullOrEmpty(experienceJson)}");
+            _logger.LogInformation($"ParsedData has Education: {!string.IsNullOrEmpty(educationJson)}");
+
             return Ok(new
             {
                 resumeId = resume.ResumeId,
@@ -179,14 +287,18 @@ public class ResumesController : ControllerBase
                 fileName = resume.FileName,
                 fileType = resume.FileType,
                 uploadedAt = resume.UploadedAt,
+                parsedDataId = parsedDataEntity.ParsedDataId,
+                hasSkills = !string.IsNullOrEmpty(skillsJson),
+                hasExperience = !string.IsNullOrEmpty(experienceJson),
+                hasEducation = !string.IsNullOrEmpty(educationJson),
                 status = "success",
-                message = "Resume uploaded and stored successfully"
+                message = "Resume uploaded and processed successfully"
             });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error uploading resume");
-            return StatusCode(500, new { error = "Failed to process resume", details = ex.Message });
+            return StatusCode(500, new { error = "Failed to process resume", details = ex.Message, stackTrace = ex.StackTrace });
         }
     }
 
@@ -247,6 +359,7 @@ public class ResumesController : ControllerBase
                         .Where(pd => pd.ResumeId == r.ResumeId)
                         .Select(pd => new
                         {
+                            pd.ParsedDataId,
                             pd.Skills,
                             pd.Experience,
                             pd.Education,
@@ -295,17 +408,10 @@ public class ResumesController : ControllerBase
     }
 
     private string ComputeFileHash(IFormFile file)
-{
-    using var sha = System.Security.Cryptography.SHA256.Create();
-    using var stream = file.OpenReadStream();
-    var hash = sha.ComputeHash(stream);
-    return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-}
-// private string ComputeFileHash(IFormFile file)
-    // {
-    //     using var md5 = MD5.Create();
-    //     using var stream = file.OpenReadStream();
-    //     var hash = md5.ComputeHash(stream);
-    //     return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-    // }
+    {
+        using var sha = SHA256.Create();
+        using var stream = file.OpenReadStream();
+        var hash = sha.ComputeHash(stream);
+        return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+    }
 }
