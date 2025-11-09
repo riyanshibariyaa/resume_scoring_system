@@ -13,7 +13,11 @@ namespace ResumeScoring.Api.Data
 
         public DbSet<Job> Jobs { get; set; }
         public DbSet<Resume> Resumes { get; set; }
+        // Add inside ApplicationDbContext class (near other DbSet<>)
+        public DbSet<ParsedData> ParsedData { get; set; }
+
         public DbSet<ResumeScore> ResumeScores { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -123,4 +127,39 @@ namespace ResumeScoring.Api.Data
         [ForeignKey("JobId")]
         public virtual Job? Job { get; set; }
     }
+        // ParsedData Entity - paste into ApplicationDbContext.cs (below ResumeScore)
+    [Table("ParsedData")]
+    public class ParsedData
+    {
+        [Key]
+        public int ParsedDataId { get; set; }
+
+        // FK to Resume (nullable if parsing can be done later)
+        public int? ResumeId { get; set; }
+
+        // Full extracted text (may be large)
+        public string? Text { get; set; }
+
+        // JSON blobs for structured parts from parser/NLP
+        public string? SectionsJson { get; set; }
+        public string? MetadataJson { get; set; }
+        public string? ExtractedProfileJson { get; set; } // from NLP service
+
+        // Common convenience fields (shallow copies for easy queries)
+        public string? Skills { get; set; }
+        public string? Education { get; set; }
+        public string? Experience { get; set; }
+        public string? Certifications { get; set; }
+        public string? Summary { get; set; }
+
+        public string? FileHash { get; set; }
+        public string? RawFilePath { get; set; }
+        public string? ParsedFilePath { get; set; }
+
+        public DateTime ParsedAt { get; set; } = DateTime.UtcNow;
+
+        [ForeignKey("ResumeId")]
+        public virtual Resume? Resume { get; set; }
+    }
+
 }

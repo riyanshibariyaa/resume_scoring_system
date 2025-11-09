@@ -17,6 +17,26 @@ namespace ResumeScoring.Api.Controllers
             _context = context;
             _logger = logger;
         }
+// DTO used for the POST body
+        public class ScoreRequest
+        {
+            public int ResumeId { get; set; }
+            public int JobId { get; set; }
+        }
+
+        /// <summary>
+        /// Accepts POST /api/v1/scoring with body { resumeId, jobId } and runs scoring.
+        /// This provides a simple endpoint your frontend can call.
+        /// </summary>
+        [HttpPost]                 // matches POST api/v1/scoring
+        public async Task<IActionResult> CreateScore([FromBody] ScoreRequest request)
+        {
+            if (request == null)
+                return BadRequest(new { error = "Request body is required: { resumeId, jobId }" });
+
+            // Reuse existing action. If ScoreResume performs extra behavior (logging, validation), it'll run as before.
+            return await ScoreResume(request.ResumeId, request.JobId);
+        }
 
         [HttpPost("score-resume/{resumeId}/job/{jobId}")]
         public async Task<IActionResult> ScoreResume(int resumeId, int jobId)
@@ -202,16 +222,17 @@ namespace ResumeScoring.Api.Controllers
                     {
                         scoreId = s.ScoreId,
                         resumeId = s.ResumeId,
-                        candidateName = s.Resume.CandidateName,
-                        fileName = s.Resume.FileName,
-                        email = s.Resume.Email,
-                        phone = s.Resume.Phone,
+                        candidateName = s.Resume != null ? s.Resume.CandidateName : null,
+                        fileName = s.Resume != null ? s.Resume.FileName : null,
+                        email = s.Resume != null ? s.Resume.Email : null,
+                        phone = s.Resume != null ? s.Resume.Phone : null,
                         totalScore = Math.Round(s.TotalScore, 2),
                         educationScore = Math.Round(s.EducationScore, 2),
                         experienceScore = Math.Round(s.ExperienceScore, 2),
                         skillsScore = Math.Round(s.SkillsScore, 2),
                         scoredAt = s.ScoredAt
                     })
+
                     .ToListAsync();
 
                 return Ok(scores);
@@ -222,17 +243,18 @@ namespace ResumeScoring.Api.Controllers
                 return StatusCode(500, new { message = "Error fetching scores", error = ex.Message });
             }
         }
-
-        private (decimal Education, decimal Experience, decimal Skills) ParseWeightConfig(string weightConfig)
+        private (decimal Education, decimal Experience, decimal Skills) ParseWeightConfig(string? weightConfig)
         {
             try
             {
-                if (string.IsNullOrEmpty(weightConfig))
+                if (string.IsNullOrWhiteSpace(weightConfig))
                 {
                     return (0.25m, 0.35m, 0.40m); // Default weights
                 }
 
-                var weights = JsonSerializer.Deserialize<Dictionary<string, decimal>>(weightConfig);
+                var weights = JsonSerializer.Deserialize<Dictionary<string, decimal>>(weightConfig)
+                            ?? new Dictionary<string, decimal>();
+
                 return (
                     weights.GetValueOrDefault("education", 0.25m),
                     weights.GetValueOrDefault("experience", 0.35m),
@@ -244,6 +266,28 @@ namespace ResumeScoring.Api.Controllers
                 return (0.25m, 0.35m, 0.40m); // Default weights on error
             }
         }
+
+        // private (decimal Education, decimal Experience, decimal Skills) ParseWeightConfig(string weightConfig)
+        // {
+        //     try
+        //     {
+        //         if (string.IsNullOrEmpty(weightConfig))
+        //         {
+        //             return (0.25m, 0.35m, 0.40m); // Default weights
+        //         }
+
+        //         var weights = JsonSerializer.Deserialize<Dictionary<string, decimal>>(weightConfig);
+        //         return (
+        //             weights.GetValueOrDefault("education", 0.25m),
+        //             weights.GetValueOrDefault("experience", 0.35m),
+        //             weights.GetValueOrDefault("skills", 0.40m)
+        //         );
+        //     }
+        //     catch
+        //     {
+        //         return (0.25m, 0.35m, 0.40m); // Default weights on error
+        //     }
+        // }
 
         private decimal CalculateEducationScore(Resume resume)
         {

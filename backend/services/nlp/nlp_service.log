@@ -81,3 +81,13 @@
 2025-11-09 12:13:20.126 | INFO     | __main__:load_models:42 - Loading transformer NER model...
 2025-11-09 12:13:29.934 | INFO     | __main__:load_models:48 - Models loaded successfully
 2025-11-09 12:13:29.955 | INFO     | __main__:<module>:723 - Starting NLP Service on port 5002
+2025-11-09 13:22:35.511 | INFO     | __main__:load_models:38 - Loading spaCy model...
+2025-11-09 13:22:42.308 | INFO     | __main__:load_models:42 - Loading transformer NER model...
+2025-11-09 13:22:57.170 | INFO     | __main__:load_models:48 - Models loaded successfully
+2025-11-09 13:22:57.260 | INFO     | __main__:<module>:723 - Starting NLP Service on port 5002
+2025-11-09 13:25:49.944 | INFO     | __main__:extract:82 - Extracting information from 5700 characters
+2025-11-09 13:25:50.985 | INFO     | __main__:extract_entities:700 - Extraction complete: Found 0 experiences, 14 skills
+2025-11-09 13:27:11.044 | INFO     | __main__:extract:82 - Extracting information from 5398 characters
+2025-11-09 13:27:12.350 | INFO     | __main__:extract_entities:700 - Extraction complete: Found 3 experiences, 9 skills
+2025-11-09 14:12:33.966 | INFO     | __main__:extract:82 - Extracting information from 5971 characters
+2025-11-09 14:13:01.775 | INFO     | __main__:extract_entities:700 - Extraction complete: Found 3 experiences, 11 skills

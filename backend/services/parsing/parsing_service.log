@@ -91,3 +91,16 @@
 2025-11-09 12:01:56.019 | INFO     | __main__:_parse_docx:186 - Successfully parsed DOCX: 5398 characters
 2025-11-09 12:01:56.097 | INFO     | __main__:parse_resume:406 - Successfully parsed document: Riyanshi_Bariya_CV.docx (hash: e868a815fbee)
 2025-11-09 12:12:53.467 | INFO     | __main__:<module>:495 - Starting Parsing Service on port 5001
+2025-11-09 13:21:55.851 | INFO     | __main__:<module>:495 - Starting Parsing Service on port 5001
+2025-11-09 13:25:45.381 | INFO     | __main__:parse_resume:366 - File saved: ./uploads\20251109_075545_Riyanshi_CV.pdf
+2025-11-09 13:25:47.330 | INFO     | __main__:parse_document:61 - Parsing document: ./uploads\20251109_075545_Riyanshi_CV.pdf (format: pdf)
+2025-11-09 13:25:47.469 | INFO     | __main__:_parse_pdf:131 - Successfully parsed PDF: 5700 characters
+2025-11-09 13:25:47.555 | INFO     | __main__:parse_resume:406 - Successfully parsed document: Riyanshi_CV.pdf (hash: bd82a76bfd75)
+2025-11-09 13:27:08.443 | INFO     | __main__:parse_resume:366 - File saved: ./uploads\20251109_075708_Riyanshi_Bariya_CV.docx
+2025-11-09 13:27:08.493 | INFO     | __main__:parse_document:61 - Parsing document: ./uploads\20251109_075708_Riyanshi_Bariya_CV.docx (format: docx)
+2025-11-09 13:27:08.828 | INFO     | __main__:_parse_docx:186 - Successfully parsed DOCX: 5398 characters
+2025-11-09 13:27:08.878 | INFO     | __main__:parse_resume:406 - Successfully parsed document: Riyanshi_Bariya_CV.docx (hash: e868a815fbee)
+2025-11-09 14:12:31.408 | INFO     | __main__:parse_resume:366 - File saved: ./uploads\20251109_084231_Riyanshi_Bariya_CV.pdf
+2025-11-09 14:12:31.524 | INFO     | __main__:parse_document:61 - Parsing document: ./uploads\20251109_084231_Riyanshi_Bariya_CV.pdf (format: pdf)
+2025-11-09 14:12:31.613 | INFO     | __main__:_parse_pdf:131 - Successfully parsed PDF: 5971 characters
+2025-11-09 14:12:31.687 | INFO     | __main__:parse_resume:406 - Successfully parsed document: Riyanshi_Bariya_CV.pdf (hash: 9339fec00ff7)

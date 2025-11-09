@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "wfTSA5GhByKPgVoLrVy6INLr/sy1ZiHQyuM1WAs5+EQ=",
+  "Source": "ResumeScoring.Api",
+  "BasePath": "_content/ResumeScoring.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
