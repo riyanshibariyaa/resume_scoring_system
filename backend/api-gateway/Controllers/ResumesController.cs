@@ -335,6 +335,90 @@ public class ResumesController : ControllerBase
         }
     }
 
+    [HttpPost("generate-embeddings")]
+    public async Task<IActionResult> GenerateResumeEmbeddings()
+    {
+        try
+        {
+            var resumes = await _context.Resumes
+                .Where(r => !string.IsNullOrEmpty(r.RawText))
+                .ToListAsync();
+
+            _logger.LogInformation($"Generating embeddings for {resumes.Count} resumes");
+
+            var embeddingsServiceUrl = Environment.GetEnvironmentVariable("EMBEDDINGS_SERVICE_URL") ?? "http://localhost:5003";
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromMinutes(5);
+
+            int successCount = 0;
+            foreach (var resume in resumes)
+            {
+                try
+                {
+                    // Call embeddings service
+                    var requestData = new { text = resume.RawText };
+                    var json = JsonSerializer.Serialize(requestData);
+                    var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                    var response = await httpClient.PostAsync($"{embeddingsServiceUrl}/embed", content);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var responseText = await response.Content.ReadAsStringAsync();
+                        using var doc = JsonDocument.Parse(responseText);
+
+                        if (doc.RootElement.TryGetProperty("embedding", out var embeddingElement))
+                        {
+                            var embeddingVector = embeddingElement.GetRawText();
+
+                            // Check if embedding already exists
+                            var existingEmbedding = await _context.Embeddings
+                                .FirstOrDefaultAsync(e => e.EntityType == "Resume" && e.EntityId == resume.ResumeId);
+
+                            if (existingEmbedding != null)
+                            {
+                                existingEmbedding.VectorData = embeddingVector;
+                                existingEmbedding.CreatedAt = DateTime.UtcNow;
+                            }
+                            else
+                            {
+                                var embedding = new Embedding
+                                {
+                                    EntityId = resume.ResumeId,
+                                    EntityType = "Resume",
+                                    VectorData = embeddingVector,
+                                    CreatedAt = DateTime.UtcNow
+                                };
+                                _context.Embeddings.Add(embedding);
+                            }
+
+                            successCount++;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Failed to generate embedding for resume {resume.ResumeId}");
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                totalResumes = resumes.Count,
+                successCount,
+                message = $"Generated embeddings for {successCount} resumes"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating resume embeddings");
+            return StatusCode(500, new { message = "Error generating embeddings", error = ex.Message });
+        }
+    }
+
+
     /// <summary>
     /// Get resume by ID with parsed data if available
     /// </summary>

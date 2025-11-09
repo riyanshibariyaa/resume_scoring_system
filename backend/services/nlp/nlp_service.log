@@ -214,3 +214,16 @@
 2025-11-10 00:57:05.570 | INFO     | __main__:_extract_experience:349 - Found experience section at position 851
 2025-11-10 00:57:05.885 | INFO     | __main__:_extract_experience:475 - Extracted 1 experiences
 2025-11-10 00:57:05.982 | INFO     | __main__:extract_entities:838 - Extraction complete: Found 1 experiences, 42 skills
+2025-11-10 01:15:18.004 | INFO     | __main__:load_models:38 - Loading spaCy model...
+2025-11-10 01:15:24.759 | INFO     | __main__:load_models:42 - Loading transformer NER model...
+2025-11-10 01:15:39.401 | INFO     | __main__:load_models:48 - Models loaded successfully
+2025-11-10 01:15:39.430 | INFO     | __main__:<module>:861 - Starting NLP Service on port 5002
+2025-11-10 01:19:11.087 | INFO     | __main__:extract:82 - Extracting information from 5530 characters
+2025-11-10 01:20:43.151 | WARNING  | __main__:_extract_experience:339 - No experience section found in sections array, searching manually...
+2025-11-10 01:20:43.160 | INFO     | __main__:_extract_experience:349 - Found experience section at position 779
+2025-11-10 01:20:43.495 | INFO     | __main__:_extract_experience:475 - Extracted 1 experiences
+2025-11-10 01:20:43.631 | INFO     | __main__:extract_entities:838 - Extraction complete: Found 1 experiences, 43 skills
+2025-11-10 01:45:31.163 | INFO     | __main__:load_models:38 - Loading spaCy model...
+2025-11-10 01:45:35.652 | INFO     | __main__:load_models:42 - Loading transformer NER model...
+2025-11-10 01:45:57.576 | INFO     | __main__:load_models:48 - Models loaded successfully
+2025-11-10 01:45:57.730 | INFO     | __main__:<module>:861 - Starting NLP Service on port 5002

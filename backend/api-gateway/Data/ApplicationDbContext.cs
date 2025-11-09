@@ -14,9 +14,7 @@ namespace ResumeScoring.Api.Data
 
         public DbSet<Job> Jobs { get; set; }
         public DbSet<Resume> Resumes { get; set; }
-        // Add inside ApplicationDbContext class (near other DbSet<>)
         public DbSet<ParsedData> ParsedDatas { get; set; }
-
         public DbSet<ResumeScore> ResumeScores { get; set; }
         public DbSet<Embedding> Embeddings { get; set; }
 
@@ -62,9 +60,6 @@ namespace ResumeScoring.Api.Data
         [Table("Jobs")]
         public class Job
         {
-            internal string? EmbeddingVector;
-
-
             [Key]
             public int JobId { get; set; }
 
@@ -81,6 +76,9 @@ namespace ResumeScoring.Api.Data
             public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
             public string? WeightConfig { get; set; }
+
+            // ✅ FIX: Change from internal to public
+            public string? EmbeddingVector { get; set; }
         }
 
         // Resume Entity
@@ -150,7 +148,8 @@ namespace ResumeScoring.Api.Data
             [ForeignKey("JobId")]
             public virtual Job? Job { get; set; }
         }
-        // ParsedData Entity - paste into ApplicationDbContext.cs (below ResumeScore)
+
+        // ParsedData Entity
         [Table("ParsedData")]
         public class ParsedData
         {
