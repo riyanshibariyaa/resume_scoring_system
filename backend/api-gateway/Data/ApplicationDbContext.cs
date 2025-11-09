@@ -19,6 +19,7 @@ namespace ResumeScoring.Data
         public DbSet<Skill> Skills { get; set; } = null!;
         public DbSet<WorkExperience> WorkExperience { get; set; } = null!;
         public DbSet<Education> Education { get; set; } = null!;
+        public DbSet<ResumeScore> ResumeScores { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
