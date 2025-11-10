@@ -223,3 +223,21 @@
 2025-11-10 01:19:08.185 | INFO     | __main__:_parse_pdf:131 - Successfully parsed PDF: 5530 characters
 2025-11-10 01:19:08.277 | INFO     | __main__:parse_resume:406 - Successfully parsed document: Riyanshi_Bariya_CV_.pdf (hash: 85c07f3c0bf2)
 2025-11-10 01:44:52.488 | INFO     | __main__:<module>:495 - Starting Parsing Service on port 5001
+2025-11-10 03:38:45.755 | INFO     | __main__:<module>:495 - Starting Parsing Service on port 5001
+2025-11-10 04:00:13.780 | INFO     | __main__:parse_resume:366 - File saved: ./uploads\20251109_223013_senior-software-engineer2_-_Template_15.pdf
+2025-11-10 04:00:13.884 | INFO     | __main__:parse_document:61 - Parsing document: ./uploads\20251109_223013_senior-software-engineer2_-_Template_15.pdf (format: pdf)
+2025-11-10 04:00:13.980 | INFO     | __main__:_parse_pdf:131 - Successfully parsed PDF: 3158 characters
+2025-11-10 04:00:14.055 | INFO     | __main__:parse_resume:406 - Successfully parsed document: senior-software-engineer2_-_Template_15.pdf (hash: a987295a0970)
+2025-11-10 04:04:43.358 | INFO     | __main__:parse_resume:366 - File saved: ./uploads\20251109_223443_Riyanshi_Bariya.pdf
+2025-11-10 04:04:43.456 | INFO     | __main__:parse_document:61 - Parsing document: ./uploads\20251109_223443_Riyanshi_Bariya.pdf (format: pdf)
+2025-11-10 04:04:43.563 | INFO     | __main__:_parse_pdf:131 - Successfully parsed PDF: 5971 characters
+2025-11-10 04:04:43.575 | INFO     | __main__:parse_resume:406 - Successfully parsed document: Riyanshi_Bariya.pdf (hash: 9339fec00ff7)
+2025-11-10 04:22:05.819 | INFO     | __main__:parse_resume:366 - File saved: ./uploads\20251109_225205_Riyanshi_Bariya_CV_.pdf
+2025-11-10 04:22:06.317 | INFO     | __main__:parse_document:61 - Parsing document: ./uploads\20251109_225205_Riyanshi_Bariya_CV_.pdf (format: pdf)
+2025-11-10 04:22:06.410 | INFO     | __main__:_parse_pdf:131 - Successfully parsed PDF: 5530 characters
+2025-11-10 04:22:06.477 | INFO     | __main__:parse_resume:406 - Successfully parsed document: Riyanshi_Bariya_CV_.pdf (hash: 85c07f3c0bf2)
+2025-11-10 12:41:38.802 | INFO     | __main__:<module>:495 - Starting Parsing Service on port 5001
+2025-11-10 12:51:08.544 | INFO     | __main__:parse_resume:366 - File saved: ./uploads\20251110_072108_senior-software-engineer2_-_Template_15.pdf
+2025-11-10 12:51:08.726 | INFO     | __main__:parse_document:61 - Parsing document: ./uploads\20251110_072108_senior-software-engineer2_-_Template_15.pdf (format: pdf)
+2025-11-10 12:51:08.885 | INFO     | __main__:_parse_pdf:131 - Successfully parsed PDF: 3158 characters
+2025-11-10 12:51:08.944 | INFO     | __main__:parse_resume:406 - Successfully parsed document: senior-software-engineer2_-_Template_15.pdf (hash: a987295a0970)
